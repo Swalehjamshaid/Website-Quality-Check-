@@ -1,0 +1,936 @@
+import React, { useState, useEffect, useMemo } from 'react';
+// import { createClient } from '@supabase/supabase-js'; // RESOLVED: Cannot resolve package, using CDN access instead.
+import {
+    LayoutDashboard, Globe, Wrench, Shield, Zap, Search,
+    Link, Settings, PlusCircle, Trash2, Loader2, BarChart, XCircle, CheckCircle, Smartphone, Clock, TrendingUp
+} from 'lucide-react';
+
+// RESOLVED: Injecting Supabase CDN script and accessing the global object.
+const SUPABASE_CDN_URL = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
+
+// --- SUPABASE CONFIGURATION (REPLACE WITH YOUR KEYS) ---
+const SUPABASE_URL = 'YOUR_SUPABASE_PROJECT_URL'; // e.g., https://abcde12345.supabase.co
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY'; // Found in Project Settings > API
+
+// Initialize supabase client instance globally after checking for script injection
+let supabase = null;
+
+// Helper to inject script and initialize client
+const initializeSupabase = (url, key, setInitStatus) => {
+    if (window.supabase && window.supabase.createClient) {
+        supabase = window.supabase.createClient(url, key);
+        setInitStatus(true);
+        return;
+    }
+
+    const script = document.createElement('script');
+    script.src = SUPABASE_CDN_URL;
+    script.onload = () => {
+        if (window.supabase && window.supabase.createClient) {
+            supabase = window.supabase.createClient(url, key);
+            setInitStatus(true);
+        } else {
+            console.error("Supabase CDN loaded but client object not found.");
+            setInitStatus(true);
+        }
+    };
+    script.onerror = () => {
+        console.error("Failed to load Supabase CDN script.");
+        setInitStatus(true);
+    };
+    document.head.appendChild(script);
+};
+
+// Helper to generate a unique ID (used for mock reports before inserting into Supabase)
+const generateId = () => Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
+
+// --- MOCK TESTING ENGINE (Represents Python Backend Results) ---
+
+// Generates a random score between min and max (inclusive)
+const randomScore = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+
+// Simulates the complex backend QA process
+const generateReport = (url) => {
+    // Generate scores for each category
+    const perfScore = randomScore(40, 95);
+    const seoScore = randomScore(60, 100);
+    const securityScore = randomScore(70, 98);
+    const mobileScore = randomScore(50, 99);
+    const linkScore = randomScore(80, 100);
+
+    // Calculate overall health score (weighted average)
+    const healthScore = Math.round((perfScore * 0.25 + seoScore * 0.2 + securityScore * 0.2 + mobileScore * 0.15 + linkScore * 0.2));
+
+    const issues = [
+        'Missing H1 tag on homepage',
+        'Image sizes are too large (1.5MB+)',
+        'Server response time is slow (> 500ms)',
+        'CORS policy detected on payment gateway',
+        'Broken internal link on the "About Us" page',
+        'Viewports are not optimized for tablets',
+        'Missing Security Headers (CSP)',
+    ];
+
+    const detailedReport = {
+        // Performance Details
+        performance: {
+            score: perfScore,
+            metrics: [
+                { name: 'FCP (First Contentful Paint)', value: `${randomScore(1, 3)}s`, status: perfScore < 70 ? 'slow' : 'good' },
+                { name: 'Server Response Time', value: `${randomScore(100, 800)}ms`, status: perfScore < 60 ? 'slow' : 'ok' },
+                { name: 'Render Blocking Resources', value: `${randomScore(0, 5)}`, status: perfScore < 80 ? 'warn' : 'good' },
+            ],
+        },
+        // SEO Details
+        seo: {
+            score: seoScore,
+            metrics: [
+                { name: 'Meta Descriptions', value: `${randomScore(90, 100)}% coverage`, status: seoScore > 90 ? 'good' : 'warn' },
+                { name: 'Canonical Tags', value: `${randomScore(95, 100)}% present`, status: seoScore > 95 ? 'good' : 'ok' },
+                { name: 'H1 Tag Check', value: `${randomScore(70, 100)}% pass`, status: seoScore < 85 ? 'warn' : 'good' },
+            ],
+        },
+        // Security Details
+        security: {
+            score: securityScore,
+            metrics: [
+                { name: 'SSL/TLS Status', value: 'Active', status: 'good' },
+                { name: 'Security Headers', value: securityScore < 85 ? 'Missing CSP' : 'All present', status: securityScore < 85 ? 'critical' : 'good' },
+                { name: 'Vulnerability Scan', value: securityScore > 95 ? 'None Found' : 'Low Severity', status: securityScore > 95 ? 'good' : 'warn' },
+            ],
+        },
+        // Mobile Details
+        mobile: {
+            score: mobileScore,
+            metrics: [
+                { name: 'Tap Target Size', value: mobileScore > 90 ? 'Good' : 'Needs Fix', status: mobileScore > 90 ? 'good' : 'warn' },
+                { name: 'Viewport Tag', value: 'Present', status: 'good' },
+            ],
+        },
+        // Link Details (Includes Uptime/Crawl Status)
+        links: {
+            score: linkScore,
+            metrics: [
+                { name: 'Broken Internal Links', value: linkScore > 98 ? '0' : randomScore(1, 5).toString(), status: linkScore < 98 ? 'critical' : 'good' },
+                { name: 'Broken External Links', value: '0', status: 'good' },
+                { name: 'Screenshot Status', value: 'Captured', status: 'good' },
+                { name: 'Pages Tested', value: randomScore(50, 200).toString(), status: 'good' }, // Multi-page testing
+            ],
+        }
+    };
+
+    // Add a few issues based on scores
+    const potentialIssues = [];
+    if (perfScore < 70) potentialIssues.push(issues[1], issues[2]);
+    if (seoScore < 80) potentialIssues.push(issues[0]);
+    if (securityScore < 85) potentialIssues.push(issues[3], issues[6]);
+    if (mobileScore < 80) potentialIssues.push(issues[5]);
+    if (linkScore < 95) potentialIssues.push(issues[4]);
+
+    return {
+        id: generateId(),
+        websiteUrl: url,
+        healthScore: healthScore,
+        summary: {
+            performance: perfScore,
+            seo: seoScore,
+            security: securityScore,
+            mobile: mobileScore,
+            links: linkScore,
+        },
+        issuesFound: potentialIssues.slice(0, randomScore(1, 4)), // Pick 1-4 issues
+        details: detailedReport,
+    };
+};
+
+// --- UTILITY COMPONENTS ---
+
+// Custom Modal Component
+const Modal = ({ title, children, onClose }) => (
+    <div className="fixed inset-0 bg-gray-900 bg-opacity-75 z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden transform transition-all border border-indigo-100">
+            <div className="flex justify-between items-center p-5 border-b border-indigo-50 bg-indigo-50/50">
+                <h3 className="text-xl font-bold text-gray-800 flex items-center space-x-2"><TrendingUp size={24} className="text-indigo-600"/><span>{title}</span></h3>
+                <button onClick={onClose} className="text-gray-400 hover:text-indigo-600 transition p-1 rounded-full hover:bg-indigo-100">
+                    <XCircle size={24} />
+                </button>
+            </div>
+            <div className="p-6 max-h-[70vh] overflow-y-auto">
+                {children}
+            </div>
+        </div>
+    </div>
+);
+
+// Health Score Gauge Component
+const HealthScore = ({ score, size = 160 }) => {
+    const radius = size / 2 - 10;
+    const circumference = 2 * Math.PI * radius;
+    const offset = circumference - (score / 100) * circumference;
+
+    let color = 'text-green-500';
+    if (score < 70) color = 'text-yellow-500';
+    if (score < 50) color = 'text-red-500';
+
+    return (
+        <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
+            <svg className="transform -rotate-90" width={size} height={size}>
+                <circle
+                    className="text-gray-200"
+                    strokeWidth="10"
+                    stroke="currentColor"
+                    fill="transparent"
+                    r={radius}
+                    cx={size / 2}
+                    cy={size / 2}
+                />
+                <circle
+                    className={`${color} transition-all duration-1000 ease-out`}
+                    strokeWidth="10"
+                    strokeDasharray={circumference}
+                    strokeDashoffset={offset}
+                    strokeLinecap="round"
+                    stroke="currentColor"
+                    fill="transparent"
+                    r={radius}
+                    cx={size / 2}
+                    cy={size / 2}
+                />
+            </svg>
+            <div className="absolute flex flex-col items-center justify-center">
+                <div className={`text-5xl font-extrabold ${color}`}>{score}</div>
+                <div className="text-base font-medium text-gray-500">Health Score</div>
+            </div>
+        </div>
+    );
+};
+
+// Card Component
+const Card = ({ children, className = '' }) => (
+    <div className={`bg-white p-6 rounded-2xl shadow-xl transition duration-300 hover:shadow-2xl border border-gray-100 ${className}`}>
+        {children}
+    </div>
+);
+
+// Metric Display Component
+const Metric = ({ name, score, icon: Icon, colorClass }) => (
+    <Card className="flex flex-col items-start space-y-3 p-4">
+        <div className={`p-3 rounded-xl ${colorClass} text-white shadow-md`}>
+            <Icon size={20} />
+        </div>
+        <div className="text-3xl font-bold text-gray-900">{score}</div>
+        <div className="text-sm font-medium text-gray-500">{name}</div>
+        <div className={`w-full h-2 rounded-full ${colorClass}`} style={{ width: `${score}%` }}></div>
+    </Card>
+);
+
+// Status Icon Map
+const StatusIcon = ({ status }) => {
+    switch (status) {
+        case 'good':
+            return <CheckCircle size={16} className="text-green-500" />;
+        case 'ok':
+            return <CheckCircle size={16} className="text-green-300" />;
+        case 'warn':
+            return <XCircle size={16} className="text-yellow-500" />;
+        case 'critical':
+            return <XCircle size={16} className="text-red-500" />;
+        case 'slow':
+            return <Clock size={16} className="text-red-500" />;
+        default:
+            return null;
+    }
+};
+
+// --- SUPABASE HOOKS AND FUNCTIONS ---
+
+const useAuth = () => {
+    const [userId, setUserId] = useState(null);
+    const [isAuthReady, setIsAuthReady] = useState(false);
+    const [isSupabaseInitialized, setIsSupabaseInitialized] = useState(false);
+
+    useEffect(() => {
+        if (supabase === null) {
+            initializeSupabase(SUPABASE_URL, SUPABASE_ANON_KEY, setIsSupabaseInitialized);
+            return;
+        }
+
+        if (isSupabaseInitialized) {
+            // Sign in anonymously to get a stable user ID for RLS checks
+            const signInAnonymously = async () => {
+                const { data, error } = await supabase.auth.signInAnonymously();
+
+                if (error) {
+                    console.error("Supabase Anonymous Sign-In Failed:", error);
+                }
+
+                const user = data?.user || supabase.auth.user();
+                if (user) {
+                    setUserId(user.id);
+                } else {
+                    // Fallback if anonymous sign-in is disabled or fails
+                    setUserId(crypto.randomUUID());
+                }
+                setIsAuthReady(true);
+            };
+
+            signInAnonymously();
+        }
+    }, [isSupabaseInitialized]);
+
+    return { userId, isAuthReady, isSupabaseInitialized };
+};
+
+const useClients = (userId, isAuthReady, isSupabaseInitialized) => {
+    const [clients, setClients] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        if (!isAuthReady || !userId || !isSupabaseInitialized || supabase === null) {
+            if (isAuthReady) setIsLoading(false);
+            return;
+        }
+
+        const fetchClients = async () => {
+            setIsLoading(true);
+            try {
+                // Supabase RLS handles filtering by user_id automatically
+                const { data, error } = await supabase
+                    .from('clients')
+                    .select('*')
+                    .order('created_at', { ascending: true });
+
+                if (error) throw error;
+                setClients(data || []);
+            } catch (error) {
+                console.error("Error fetching clients:", error.message);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        // Realtime subscription for clients table
+        const clientChannel = supabase
+            .channel('clients-changes')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, fetchClients)
+            .subscribe();
+
+        fetchClients();
+
+        return () => {
+            if (supabase) supabase.removeChannel(clientChannel);
+        };
+    }, [userId, isAuthReady, isSupabaseInitialized]);
+
+    return { clients, isLoading };
+};
+
+const useReports = (userId, isAuthReady, isSupabaseInitialized) => {
+    const [reports, setReports] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        if (!isAuthReady || !userId || !isSupabaseInitialized || supabase === null) {
+            if (isAuthReady) setIsLoading(false);
+            return;
+        }
+
+        const fetchReports = async () => {
+            setIsLoading(true);
+            try {
+                // Supabase RLS handles filtering by user_id
+                const { data, error } = await supabase
+                    .from('reports')
+                    .select('*')
+                    .order('timestamp', { ascending: false });
+
+                if (error) throw error;
+                setReports(data || []);
+            } catch (error) {
+                console.error("Error fetching reports:", error.message);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        
+        // Realtime subscription for reports table
+        const reportChannel = supabase
+            .channel('reports-changes')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'reports' }, fetchReports)
+            .subscribe();
+
+        fetchReports();
+
+        return () => {
+            if (supabase) supabase.removeChannel(reportChannel);
+        };
+
+    }, [userId, isAuthReady, isSupabaseInitialized]);
+
+    return { reports, isLoading };
+};
+
+const addClient = async (userId, clientData) => {
+    if (!userId || supabase === null) return;
+    const { data, error } = await supabase
+        .from('clients')
+        .insert({
+            user_id: userId, // CRITICAL: Supabase RLS checks this column
+            client_name: clientData.clientName,
+            website_url: clientData.websiteUrl,
+        })
+        .select('id')
+        .single();
+    
+    if (error) {
+        console.error("Failed to add client:", error);
+        throw error;
+    }
+    return data.id;
+};
+
+const deleteClient = async (userId, clientId) => {
+    if (!userId || !clientId || supabase === null) return;
+
+    // RLS policy prevents deleting others' data. 
+    // Reports linked by client_id should cascade delete in the database via foreign key constraint.
+    const { error } = await supabase
+        .from('clients')
+        .delete()
+        .eq('id', clientId);
+        
+    if (error) {
+        console.error("Failed to delete client:", error);
+        throw error;
+    }
+};
+
+const runTestAndSaveReport = async (userId, client) => {
+    if (!userId || !client || supabase === null) return;
+    
+    // NOTE: In a production environment, this function would make a POST request 
+    // to a Python FastAPI/Flask backend service to run the actual crawling/testing.
+    // The Python backend would then insert the report data into Supabase itself.
+
+    const newReportData = generateReport(client.website_url); // Use client.website_url
+
+    // 1. Save the new report
+    const { error: reportError } = await supabase
+        .from('reports')
+        .insert({
+            id: newReportData.id,
+            user_id: userId, // CRITICAL for RLS
+            client_id: client.id,
+            health_score: newReportData.healthScore,
+            summary: newReportData.summary,
+            issues_found: newReportData.issuesFound,
+            details: newReportData.details,
+            website_url: newReportData.websiteUrl,
+        });
+
+    if (reportError) {
+        console.error("Failed to save report:", reportError);
+        throw reportError;
+    }
+
+    // 2. Update the client's lastReportId
+    const { error: clientUpdateError } = await supabase
+        .from('clients')
+        .update({ last_report_id: newReportData.id })
+        .eq('id', client.id);
+
+    if (clientUpdateError) {
+        console.error("Failed to update client last report ID:", clientUpdateError);
+        // Continue, as the report was saved successfully
+    }
+};
+
+
+// --- VIEWS ---
+
+// 1. Client List & Management
+const ClientsView = ({ clients, isLoading, userId }) => {
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [newClientName, setNewClientName] = useState('');
+    const [newClientUrl, setNewClientUrl] = useState('');
+    const [isAdding, setIsAdding] = useState(false);
+
+    const handleAddClient = async (e) => {
+        e.preventDefault();
+        if (!newClientName || !newClientUrl || !userId) return;
+        setIsAdding(true);
+        try {
+            await addClient(userId, {
+                clientName: newClientName,
+                websiteUrl: newClientUrl,
+            });
+            setNewClientName('');
+            setNewClientUrl('');
+            setIsModalOpen(false);
+        } catch (error) {
+            // Error is handled in addClient and logged
+        } finally {
+            setIsAdding(false);
+        }
+    };
+
+    const [clientToDelete, setClientToDelete] = useState(null);
+
+    const handleDelete = async () => {
+        if (!clientToDelete || !userId) return;
+
+        try {
+            // Note: This only deletes the client, the report deletion is handled by DB CASCADE rule.
+            await deleteClient(userId, clientToDelete.id);
+        } catch (error) {
+            console.error("Failed to delete client:", error);
+        } finally {
+            setClientToDelete(null);
+        }
+    };
+
+    if (isLoading) return <div className="text-center py-10"><Loader2 className="animate-spin inline mr-2 text-indigo-600" /> Loading Clients...</div>;
+
+    return (
+        <div>
+            <div className="flex justify-between items-center mb-6">
+                <h2 className="text-3xl font-extrabold text-gray-900">Client Management ({clients.length})</h2>
+                <button
+                    onClick={() => setIsModalOpen(true)}
+                    className="flex items-center space-x-2 bg-indigo-600 text-white px-5 py-2.5 rounded-xl shadow-lg hover:bg-indigo-700 transition transform hover:scale-[1.02]"
+                >
+                    <PlusCircle size={20} />
+                    <span>Add New Client</span>
+                </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {clients.map(client => (
+                    <Card key={client.id} className="relative p-5">
+                        <h3 className="text-xl font-semibold text-gray-800 truncate">{client.client_name}</h3>
+                        <p className="text-sm text-indigo-600 font-medium truncate mb-4">{client.website_url}</p>
+                        <div className="flex justify-between items-center pt-3 border-t border-gray-100">
+                            <span className="text-xs text-gray-500">
+                                Last Report: {client.last_report_id ? 'Available' : 'N/A'}
+                            </span>
+                            <div className="flex space-x-2">
+                                <button
+                                    onClick={() => runTestAndSaveReport(userId, client)}
+                                    className="text-sm text-indigo-600 hover:text-indigo-800 transition p-2 rounded-full hover:bg-indigo-50"
+                                    title="Run Manual Test (Calls Python Backend)"
+                                >
+                                    <Wrench size={18} />
+                                </button>
+                                <button
+                                    onClick={() => setClientToDelete(client)} // Trigger custom modal
+                                    className="text-sm text-red-500 hover:text-red-700 transition p-2 rounded-full hover:bg-red-50"
+                                    title="Delete Client"
+                                >
+                                    <Trash2 size={18} />
+                                </button>
+                            </div>
+                        </div>
+                    </Card>
+                ))}
+                {clients.length === 0 && (
+                    <div className="col-span-full text-center p-12 bg-gray-100 rounded-2xl text-gray-600 border-dashed border-2 border-gray-300">
+                        <Globe size={32} className="mx-auto mb-3 text-indigo-400"/>
+                        <p className="font-medium">No clients added yet. Add a website to start monitoring!</p>
+                    </div>
+                )}
+            </div>
+
+            {/* Modal for adding a client */}
+            {isModalOpen && (
+                <Modal title="Add New Website to Monitor" onClose={() => setIsModalOpen(false)}>
+                    <form onSubmit={handleAddClient} className="space-y-5">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Client or Project Name</label>
+                            <input
+                                type="text"
+                                value={newClientName}
+                                onChange={(e) => setNewClientName(e.target.value)}
+                                className="mt-1 block w-full border border-gray-300 rounded-xl shadow-sm p-3 focus:ring-indigo-500 focus:border-indigo-500 transition"
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Website URL (e.g., https://example.com)</label>
+                            <input
+                                type="url"
+                                value={newClientUrl}
+                                onChange={(e) => setNewClientUrl(e.target.value)}
+                                placeholder="https://www.mycompany.com"
+                                className="mt-1 block w-full border border-gray-300 rounded-xl shadow-sm p-3 focus:ring-indigo-500 focus:border-indigo-500 transition"
+                                required
+                            />
+                        </div>
+                        <button
+                            type="submit"
+                            disabled={isAdding}
+                            className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-lg text-base font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 transition"
+                        >
+                            {isAdding ? <Loader2 className="animate-spin mr-2" /> : <PlusCircle size={20} className="mr-2" />}
+                            {isAdding ? 'Registering Client...' : 'Save Client & Start Monitoring'}
+                        </button>
+                    </form>
+                </Modal>
+            )}
+
+            {/* Custom Modal for deletion confirmation */}
+            {clientToDelete && (
+                <Modal title="Confirm Permanent Deletion" onClose={() => setClientToDelete(null)}>
+                    <p className="text-gray-600 mb-6 text-base">
+                        You are about to delete <strong>{clientToDelete.client_name}</strong>. This will permanently remove the client and **all** associated historical QA reports. This action cannot be undone.
+                    </p>
+                    <div className="flex justify-end space-x-3">
+                        <button
+                            onClick={() => setClientToDelete(null)}
+                            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-xl hover:bg-gray-300 transition"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={handleDelete}
+                            className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-xl hover:bg-red-700 transition shadow-md"
+                        >
+                            <Trash2 size={16} className="inline mr-1" />
+                            Delete Client Permanently
+                        </button>
+                    </div>
+                </Modal>
+            )}
+        </div>
+    );
+};
+
+// 2. Detailed Report View
+const ReportDetail = ({ report }) => {
+    // Supabase returns JSONB fields as parsed
+    const details = report.details;
+
+    const sections = useMemo(() => ([
+        { name: 'Performance', icon: Zap, color: 'bg-yellow-500', data: details.performance, key: 'performance' },
+        { name: 'SEO Health', icon: Search, color: 'bg-green-500', data: details.seo, key: 'seo' },
+        { name: 'Security Audit', icon: Shield, color: 'bg-red-500', data: details.security, key: 'security' },
+        { name: 'Mobile Responsiveness', icon: Smartphone, color: 'bg-indigo-500', data: details.mobile, key: 'mobile' },
+        { name: 'Link & Uptime', icon: Link, color: 'bg-blue-500', data: details.links, key: 'links' },
+    ]), [details]);
+
+    return (
+        <div className="space-y-8">
+            <h3 className="text-2xl font-bold text-gray-800">Detailed Test Report</h3>
+
+            {/* Overall Score and Issues */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <Card className="lg:col-span-1 flex flex-col items-center justify-center space-y-4 bg-indigo-50/50">
+                    <HealthScore score={report.health_score} size={160} />
+                    <p className="text-sm text-gray-600 font-medium">Score as of {new Date(report.timestamp).toLocaleDateString()} at {new Date(report.timestamp).toLocaleTimeString()}</p>
+                </Card>
+
+                <Card className="lg:col-span-2">
+                    <h4 className="text-xl font-semibold mb-4 text-gray-800 flex items-center">
+                        <XCircle size={20} className="text-red-500 mr-2" />
+                        Critical Issues Found ({report.issues_found.length})
+                    </h4>
+                    <ul className="space-y-3 list-none p-0">
+                        {report.issues_found.map((issue, index) => (
+                            <li key={index} className="flex items-start text-base text-red-700 bg-red-50 p-4 rounded-xl border border-red-200 shadow-sm">
+                                <span className="font-bold mr-3 text-red-500">🔥</span>
+                                {issue}
+                            </li>
+                        ))}
+                    </ul>
+                    {report.issues_found.length === 0 && (
+                        <p className="text-green-600 font-medium bg-green-50 p-4 rounded-xl border border-green-200">✅ Audit complete: No critical issues detected in this run. Site is healthy!</p>
+                    )}
+                </Card>
+            </div>
+
+            {/* Sectional Metrics */}
+            {sections.map(section => (
+                <Card key={section.key} className="p-7">
+                    <div className="flex items-center space-x-3 mb-5 border-b pb-4 border-gray-100">
+                        <div className={`p-3 rounded-full ${section.color} text-white shadow-lg`}>
+                            <section.icon size={20} />
+                        </div>
+                        <h4 className="text-2xl font-bold text-gray-800">{section.name} Score: {section.data.score}%</h4>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                        {section.data.metrics.map((metric, index) => (
+                            <div key={index} className="bg-gray-50 p-4 rounded-xl flex flex-col space-y-1 shadow-inner">
+                                <span className="text-sm font-medium text-gray-600">{metric.name}</span>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-lg font-semibold text-gray-900">{metric.value}</span>
+                                    <StatusIcon status={metric.status} />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </Card>
+            ))}
+        </div>
+    );
+};
+
+// 3. Main Dashboard View
+const DashboardView = ({ clients, reports, runTest }) => {
+    const [selectedClient, setSelectedClient] = useState(null);
+    const [isTesting, setIsTesting] = useState(false);
+
+    // Set default client when data loads
+    useEffect(() => {
+        if (clients.length > 0 && !selectedClient) {
+            setSelectedClient(clients[0]);
+        } else if (clients.length === 0) {
+             setSelectedClient(null);
+        }
+    }, [clients, selectedClient]);
+
+    // Update reports when client changes or reports data changes
+    const clientReports = useMemo(() => {
+        return reports
+            .filter(r => r.client_id === selectedClient?.id)
+            .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    }, [reports, selectedClient]);
+
+
+    const handleRunTest = async (client) => {
+        setIsTesting(true);
+        // This is where you would call your Python API endpoint!
+        await runTest(client); 
+        setIsTesting(false);
+    }
+
+    if (!selectedClient) {
+        if (clients.length === 0) {
+            return (
+                <div className="text-center py-20">
+                    <h2 className="text-3xl font-extrabold text-gray-700 mb-4">Welcome to QA Autopilot!</h2>
+                    <p className="text-gray-500 text-lg">
+                        Start by adding your client websites in the **Clients** section to begin automated health monitoring.
+                    </p>
+                </div>
+            );
+        }
+        return <div className="text-center py-20"><Loader2 className="animate-spin inline mr-2 text-indigo-600" /> Loading client data...</div>;
+    }
+
+    const latestReport = clientReports[0];
+
+    return (
+        <div>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 bg-white p-6 rounded-2xl shadow-lg">
+                <div className="flex items-center space-x-4">
+                    <h2 className="text-3xl font-bold text-gray-900">{selectedClient.client_name} Monitoring</h2>
+                    <select
+                        value={selectedClient.id}
+                        onChange={(e) => setSelectedClient(clients.find(c => c.id === e.target.value))}
+                        className="p-3 border border-gray-300 rounded-xl shadow-sm bg-gray-50 focus:ring-indigo-500 focus:border-indigo-500 text-base font-medium"
+                    >
+                        {clients.map(client => (
+                            <option key={client.id} value={client.id}>{client.client_name}</option>
+                        ))}
+                    </select>
+                </div>
+                <button
+                    onClick={() => handleRunTest(selectedClient)}
+                    disabled={isTesting}
+                    className="mt-4 sm:mt-0 flex items-center space-x-2 bg-pink-600 text-white px-5 py-2.5 rounded-xl shadow-lg hover:bg-pink-700 transition transform hover:scale-[1.05] disabled:opacity-50"
+                >
+                    {isTesting ? <Loader2 className="animate-spin" size={20} /> : <Wrench size={20} />}
+                    <span>{isTesting ? 'Running Test (Python API Call)...' : 'Run Full QA Test Now'}</span>
+                </button>
+            </div>
+
+            {latestReport ? (
+                <div className="space-y-10">
+                    <h3 className="text-xl font-semibold text-gray-700">
+                        Latest Audit: <span className="text-indigo-600 font-bold">{new Date(latestReport.timestamp).toLocaleString()}</span>
+                    </h3>
+                    {/* Key Metrics Grid */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8">
+                        <Card className="col-span-2 md:col-span-1 lg:col-span-1 flex items-center justify-center p-4 bg-white">
+                            <HealthScore score={latestReport.health_score} size={130} />
+                        </Card>
+                        <Metric name="Performance" score={latestReport.summary.performance} icon={Zap} colorClass="bg-yellow-500" />
+                        <Metric name="SEO Health" score={latestReport.summary.seo} icon={Search} colorClass="bg-green-500" />
+                        <Metric name="Security Audit" score={latestReport.summary.security} icon={Shield} colorClass="bg-red-500" />
+                        <Metric name="Link & Uptime" score={latestReport.summary.links} icon={Link} colorClass="bg-blue-500" />
+                    </div>
+
+                    {/* Detailed Report Section */}
+                    <ReportDetail report={latestReport} />
+
+                    {/* History */}
+                    <Card className="p-7">
+                        <h4 className="text-2xl font-bold mb-6 flex items-center text-gray-800"><BarChart size={24} className="mr-3 text-indigo-600" /> Audit History & Trend</h4>
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        {['Date', 'Health Score', 'Performance', 'SEO', 'Security', 'Issues'].map(header => (
+                                            <th key={header} className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">{header}</th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-100">
+                                    {clientReports.slice(0, 7).map(report => (
+                                        <tr key={report.id} className="hover:bg-indigo-50 transition duration-150 cursor-pointer">
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                                {new Date(report.timestamp).toLocaleString()}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-base font-extrabold text-gray-900">{report.health_score}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm">{report.summary.performance}%</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm">{report.summary.seo}%</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm">{report.summary.security}%</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                                {report.issues_found.length > 0 ? (
+                                                    <span className="text-red-600 font-semibold">{report.issues_found.length} Critical</span>
+                                                ) : (
+                                                    <span className="text-green-600 font-semibold">Clear</span>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </Card>
+                </div>
+            ) : (
+                <Card className="text-center p-16 text-gray-600 border-dashed border-2 border-indigo-200 bg-indigo-50/30">
+                    <Globe size={64} className="mx-auto mb-5 text-indigo-500" />
+                    <h4 className="text-2xl font-bold mb-3 text-gray-800">No Reports Available</h4>
+                    <p className="text-lg">Click **Run Full QA Test Now** above to trigger the first automated audit for this client.</p>
+                </Card>
+            )}
+        </div>
+    );
+};
+
+
+// --- MAIN APP COMPONENT ---
+
+const App = () => {
+    const [view, setView] = useState('dashboard'); // 'dashboard', 'clients', 'settings'
+    const { userId, isAuthReady, isSupabaseInitialized } = useAuth();
+    const { clients, isLoading: isClientsLoading } = useClients(userId, isAuthReady, isSupabaseInitialized);
+    const { reports } = useReports(userId, isAuthReady, isSupabaseInitialized);
+
+    // This handles the mock test run and saves the result to Supabase
+    const runTest = async (client) => {
+        if (!userId || !client) return;
+        try {
+            // NOTE: Simulate Python API call latency
+            await new Promise(resolve => setTimeout(resolve, 3000)); 
+            
+            await runTestAndSaveReport(userId, client);
+        } catch (error) {
+            console.error("Test run failed:", error);
+        }
+    };
+
+    const renderView = () => {
+        if (!isAuthReady || isClientsLoading || !isSupabaseInitialized) {
+            return (
+                <div className="flex flex-col items-center justify-center h-full p-20">
+                    <Loader2 className="animate-spin text-indigo-600 mb-4" size={48} />
+                    <p className="text-xl font-medium text-gray-600">
+                        {isSupabaseInitialized ? 'Authenticating User...' : 'Loading Supabase Client...'}
+                    </p>
+                    {userId && (
+                        <p className="mt-4 text-xs text-gray-400">User ID: {userId}</p>
+                    )}
+                </div>
+            );
+        }
+
+        switch (view) {
+            case 'dashboard':
+                return <DashboardView clients={clients} reports={reports} runTest={runTest} />;
+            case 'clients':
+                return <ClientsView clients={clients} isLoading={isClientsLoading} userId={userId} />;
+            case 'settings':
+                return <SettingsView />;
+            default:
+                return <DashboardView clients={clients} reports={reports} runTest={runTest} />;
+        }
+    };
+
+    return (
+        <div className="flex h-screen bg-gray-50 antialiased font-inter">
+            {/* Sidebar */}
+            <nav className="w-64 bg-gray-900 text-white flex flex-col p-5 shadow-2xl">
+                <div className="text-3xl font-extrabold text-indigo-400 mb-12 border-b border-gray-700 pb-4">
+                    QA Autopilot
+                    <span className="text-xs text-green-400 block font-normal mt-1 tracking-widest uppercase">Health Monitor</span>
+                </div>
+                <ul className="space-y-3 flex-grow">
+                    <SidebarItem
+                        icon={LayoutDashboard}
+                        label="Dashboard"
+                        active={view === 'dashboard'}
+                        onClick={() => setView('dashboard')}
+                    />
+                    <SidebarItem
+                        icon={Globe}
+                        label={`Clients (${clients.length})`}
+                        active={view === 'clients'}
+                        onClick={() => setView('clients')}
+                    />
+                </ul>
+                <div className="pt-6 border-t border-gray-700">
+                    <SidebarItem
+                        icon={Settings}
+                        label="Settings"
+                        active={view === 'settings'}
+                        onClick={() => setView('settings')}
+                    />
+                    {userId && (
+                        <div className="mt-4 p-3 text-xs text-gray-400 bg-gray-800 rounded-lg truncate">
+                            UID: {userId}
+                        </div>
+                    )}
+                </div>
+            </nav>
+
+            {/* Main Content Area */}
+            <main className="flex-1 overflow-y-auto p-8 lg:p-10">
+                <header className="mb-8 pb-4 border-b border-gray-200">
+                    <h1 className="text-4xl font-extrabold text-gray-900">
+                        {view.charAt(0).toUpperCase() + view.slice(1)} Overview
+                    </h1>
+                </header>
+                <div className="max-w-7xl mx-auto">
+                    {renderView()}
+                </div>
+            </main>
+        </div>
+    );
+};
+
+// Sidebar Item Component
+const SidebarItem = ({ icon: Icon, label, active, onClick }) => (
+    <li className={`rounded-xl transition cursor-pointer ${active ? 'bg-indigo-600 shadow-xl' : 'hover:bg-gray-800'}`}>
+        <a onClick={onClick} className="flex items-center p-3.5 space-x-3 text-base font-medium">
+            <Icon size={20} className={active ? 'text-white' : 'text-indigo-300'} />
+            <span className={active ? 'text-white' : 'text-gray-200'}>{label}</span>
+        </a>
+    </li>
+);
+
+// Settings Placeholder View
+const SettingsView = () => (
+    <Card className="p-12 text-center bg-white border-2 border-indigo-100">
+        <Settings size={64} className="mx-auto mb-5 text-indigo-500" />
+        <h3 className="text-3xl font-bold text-gray-800 mb-3">Configuration Panel</h3>
+        <p className="text-gray-600 text-lg">Manage scheduling (daily/weekly), set report email recipients, and configure API endpoints here.</p>
+        <p className="text-sm text-gray-400 mt-5">
+            (In production, this area manages the connection settings for the external Python QA API.)
+        </p>
+    </Card>
+);
+
+export default App;
