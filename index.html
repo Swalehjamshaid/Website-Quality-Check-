@@ -25,6 +25,7 @@
             font-family: 'Inter', sans-serif;
             margin: 0;
             padding: 0;
+            background-color: #f9fafb; /* Light gray background */
         }
     </style>
 </head>
@@ -32,27 +33,58 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        // Supabase Configuration - Keys applied successfully
-        const SUPABASE_URL = 'https://uytkmnbeafbplccmbabq.supabase.co'; 
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5dGttbmJlYWZicGxjY21iYWJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQxNjk5OTAsImV4cCI6MjA3OTc0NTk5MH0.eff-1L5onwSc9oV1fV2HptNHqbE82akKM62LxY'; 
+        // =======================================================
+        // !!! CRITICAL FIX REQUIRED !!!
+        // UPDATED URL TO MATCH YOUR LATEST INPUT. 
+        // NOW, YOU MUST REPLACE THE PLACEHOLDER KEY BELOW.
+        // =======================================================
+        const SUPABASE_URL = 'https://hcmoeljjxlpcgoelyjqh.supabase.co'; 
+        const SUPABASE_ANON_KEY = 'INSERT_ANON_KEY_FOR_HCMODELJJXLPCGOELYJQH_PROJECT_HERE'; 
 
         // Initialize supabase client instance globally from the CDN-loaded object
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // Destructure necessary React hooks and Lucide icons 
+        // Destructure necessary React hooks
         const { useState, useEffect, useMemo, useCallback } = React;
         
-        // FIX: Accessing icons from the correct UMD global object (window.lucideReact.icons or window.lucide)
-        const IconSource = window.lucide || window.lucideReact; 
+        // FIX: Implement safe getter function for Lucide icons to avoid ReferenceError on startup.
+        let IconComponents = {};
+        
+        // --- SAFE ICON ACCESS FUNCTION ---
+        const safeGetIcon = (name) => {
+            if (IconComponents[name]) return IconComponents[name];
 
-        if (!IconSource) {
-            console.error("Critical Error: Lucide icon library failed to load or is not accessible globally.");
-        }
+            const IconSource = window.lucide || window.lucideReact;
+            if (IconSource) {
+                const component = (IconSource.icons && IconSource.icons[name]) || IconSource[name];
+                if (component) {
+                    IconComponents[name] = component;
+                    return component;
+                }
+            }
+            // Fallback: If icon is not found, return a component that renders a warning.
+            return ({ size, className }) => <span className={`text-red-500 ${className}`} style={{ fontSize: size }}>⚠️</span>; 
+        };
 
-        const { 
-            LayoutDashboard, Globe, Wrench, Shield, Zap, Search,
-            Link, Settings, PlusCircle, Trash2, Loader2, BarChart, XCircle, CheckCircle, Smartphone, Clock, TrendingUp
-        } = IconSource.icons || IconSource; // Use the icons property if it exists, otherwise use the object directly
+        // --- ICON COMPONENT VARIABLES ---
+        // Declare components as functions that call the safe getter.
+        const LayoutDashboard = (props) => { const Icon = safeGetIcon('LayoutDashboard'); return <Icon {...props} />; };
+        const Globe = (props) => { const Icon = safeGetIcon('Globe'); return <Icon {...props} />; };
+        const Wrench = (props) => { const Icon = safeGetIcon('Wrench'); return <Icon {...props} />; };
+        const Shield = (props) => { const Icon = safeGetIcon('Shield'); return <Icon {...props} />; };
+        const Zap = (props) => { const Icon = safeGetIcon('Zap'); return <Icon {...props} />; };
+        const Search = (props) => { const Icon = safeGetIcon('Search'); return <Icon {...props} />; };
+        const Link = (props) => { const Icon = safeGetIcon('Link'); return <Icon {...props} />; };
+        const Settings = (props) => { const Icon = safeGetIcon('Settings'); return <Icon {...props} />; };
+        const PlusCircle = (props) => { const Icon = safeGetIcon('PlusCircle'); return <Icon {...props} />; };
+        const Trash2 = (props) => { const Icon = safeGetIcon('Trash2'); return <Icon {...props} />; };
+        const Loader2 = (props) => { const Icon = safeGetIcon('Loader2'); return <Icon {...props} />; };
+        const BarChart = (props) => { const Icon = safeGetIcon('BarChart'); return <Icon {...props} />; };
+        const XCircle = (props) => { const Icon = safeGetIcon('XCircle'); return <Icon {...props} />; };
+        const CheckCircle = (props) => { const Icon = safeGetIcon('CheckCircle'); return <Icon {...props} />; };
+        const Smartphone = (props) => { const Icon = safeGetIcon('Smartphone'); return <Icon {...props} />; };
+        const Clock = (props) => { const Icon = safeGetIcon('Clock'); return <Icon {...props} />; };
+        const TrendingUp = (props) => { const Icon = safeGetIcon('TrendingUp'); return <Icon {...props} />; };
 
 
         // Helper to generate a unique ID (used for mock reports before inserting into Supabase)
@@ -265,21 +297,34 @@
             const isSupabaseInitialized = supabase !== null; 
 
             useEffect(() => {
-                if (!isSupabaseInitialized) return;
+                if (!isSupabaseInitialized) {
+                    setIsAuthReady(false);
+                    return;
+                }
 
                 // Sign in anonymously to get a stable user ID for RLS checks
                 const signInAnonymously = async () => {
                     const { data, error } = await supabase.auth.signInAnonymously();
-
+                    
                     if (error) {
                         console.error("Supabase Anonymous Sign-In Failed:", error);
+                        
+                        // CRITICAL CHECK: Log key length to help user verify they copied the full key string
+                        if (SUPABASE_ANON_KEY.length < 100) {
+                            console.error("CRITICAL CHECK: Your SUPABASE_ANON_KEY appears too short or may be truncated. It currently has a length of:", SUPABASE_ANON_KEY.length);
+                        } else if (SUPABASE_ANON_KEY.includes('INSERT_ANON_KEY')) {
+                            console.error("CRITICAL CHECK: The Supabase key placeholder is still present. You must replace it with your actual key.");
+                        }
                     }
 
-                    const user = data?.user || supabase.auth.user();
+                    // FIX: Use modern supabase.auth.getUser()
+                    const { data: userData } = await supabase.auth.getUser(); 
+                    const user = userData.user;
+
                     if (user) {
                         setUserId(user.id);
                     } else {
-                        // Fallback if anonymous sign-in is disabled or fails
+                        // Fallback if anonymous sign-in fails
                         setUserId(crypto.randomUUID());
                     }
                     setIsAuthReady(true);
@@ -636,13 +681,13 @@
                             <ul className="space-y-3 list-none p-0">
                                 {report.issues_found.map((issue, index) => (
                                     <li key={index} className="flex items-start text-base text-red-700 bg-red-50 p-4 rounded-xl border border-red-200 shadow-sm">
-                                        <span className="font-bold mr-3 text-red-500">??</span>
+                                        <span className="font-bold mr-3 text-red-500">🔥</span>
                                         {issue}
                                     </li>
                                 ))}
                             </ul>
                             {report.issues_found.length === 0 && (
-                                <p className="text-green-600 font-medium bg-green-50 p-4 rounded-xl border border-green-200">? Audit complete: No critical issues detected in this run. Site is healthy!</p>
+                                <p className="text-green-600 font-medium bg-green-50 p-4 rounded-xl border border-green-200">✅ Audit complete: No critical issues detected in this run. Site is healthy!</p>
                             )}
                         </Card>
                     </div>
@@ -765,7 +810,7 @@
 
                             /* History */
                             <Card className="p-7">
-                                <h4 className="text-2xl font-bold mb-6 flex items-center text-gray-800"><BarChart size={24} className="mr-3 text-indigo-600" /> Audit History & Trend</h4>
+                                <h4 className="2xl font-bold mb-6 flex items-center text-gray-800"><BarChart size={24} className="mr-3 text-indigo-600" /> Audit History & Trend</h4>
                                 <div className="overflow-x-auto">
                                     <table className="min-w-full divide-y divide-gray-200">
                                         <thead className="bg-gray-50">
@@ -802,7 +847,7 @@
                     ) : (
                         <Card className="text-center p-16 text-gray-600 border-dashed border-2 border-indigo-200 bg-indigo-50/30">
                             <Globe size={64} className="mx-auto mb-5 text-indigo-500" />
-                            <h4 className="text-2xl font-bold mb-3 text-gray-800">No Reports Available</h4>
+                            <h4 className="2xl font-bold mb-3 text-gray-800">No Reports Available</h4>
                             <p className="text-lg">Click **Run Full QA Test Now** above to trigger the first automated audit for this client.</p>
                         </Card>
                     )}
@@ -835,7 +880,8 @@
             const renderView = () => {
                 if (!isAuthReady || isClientsLoading || !isSupabaseInitialized) {
                     return (
-                        <div className="flex flex-col items-center justify-center h-full p-20">
+                        // FIX: Ensure loader spans full viewport height for immediate visibility
+                        <div className="flex flex-col items-center justify-center h-screen w-full absolute inset-0 z-50 bg-gray-50"> 
                             <Loader2 className="animate-spin text-indigo-600 mb-4" size={48} />
                             <p className="text-xl font-medium text-gray-600">
                                 {isSupabaseInitialized ? 'Authenticating User...' : 'Loading Supabase Client...'}
