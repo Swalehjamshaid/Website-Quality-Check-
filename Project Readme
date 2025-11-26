@@ -1,0 +1,65 @@
+🚀 QA Autopilot: Automated Website Health Monitoring SaaS
+
+This repository contains the code for a simulated Automated Website QA Testing and Monitoring SaaS application, designed to replace manual QA efforts with an automated reporting engine.
+
+The project is split into two core solutions:
+
+Frontend Dashboard (React/Firebase): A professional, modern, data-driven dashboard for client management and viewing persistent, real-time reports. This represents the polished commercial interface.
+
+Python Reporting Tool (Streamlit): A single-file, deployable application that demonstrates the reporting logic (including PDF generation and email functionality) entirely in Python.
+
+1. Python Streamlit Reporting Tool (qa_streamlit_app.py)
+
+This application is fully contained in a single Python file and is intended for quick prototyping, internal reporting, or easy deployment using Streamlit Cloud.
+
+Setup & Running
+
+Clone the repository.
+
+Install dependencies:
+
+pip install -r requirements.txt
+
+
+
+Run the application:
+
+streamlit run qa_streamlit_app.py
+
+
+
+Key Features
+
+Real PDF Generation: Generates a downloadable, professional PDF report using fpdf2.
+
+Real Email Functionality: Includes smtplib logic to send the PDF report as an attachment. Note: Requires you to use a service's specific App Password (e.g., Gmail App Password), not your main password.
+
+Robust Mock Data: Simulates multi-page crawling, security scans, and performance testing results.
+
+2. Professional Dashboard (React/Firebase)
+
+The WebsiteQADashboard.jsx file is a modern front-end built with React and Tailwind CSS. It focuses on the client-facing experience: persistent client management, historical reporting, and a polished user interface.
+
+Architecture Note
+
+This React app is designed to work as the Front-End layer, and the "Run Test Now" button is designed to represent an API Call to a separate Python Backend service (e.g., FastAPI, Flask) that would perform the actual crawling and testing logic.
+
+Setup Requirements (For the React/Firebase Frontend)
+
+Firebase Project: This application requires a Google Firebase project for authentication and Firestore persistence.
+
+Global Variables: This application relies on three global variables provided by a host environment (like Google Cloud Canvas) for Firebase initialization: __app_id, __firebase_config, and __initial_auth_token.
+
+Firestore Rules (Critical): The application uses a private data model. You must set up the following security rules in your Firestore console to allow authenticated users to read and write their own data:
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // This rule allows authenticated users (whose UID matches the path segment) 
+    // to read and write their private data under the /users/{userId} collection.
+    match /artifacts/{appId}/users/{userId}/{document=**} {
+      allow read, write: if request.auth.uid != null && request.auth.uid == userId;
+    }
+  }
+}
+
