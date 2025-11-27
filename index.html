@@ -9,6 +9,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
+    <script>const global = {}</script> 
+    
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
     <script src="https://unpkg.com/lucide-react@latest/dist/umd/lucide-react.min.js"></script>
@@ -31,7 +33,7 @@
         // =======================================================
         // ? SUPABASE KEYS and API ENDPOINT (FASTAPI Placeholder)
         // =======================================================
-        // Use your actual keys here!
+        // NOTE: These keys are for the 'webquality' project and should be correct.
         const SUPABASE_URL = 'https://uytkmnbeafbplccmbabq.supabase.co'; 
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5dGttbmJlYWZicGxjY21iYWJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQxNjk5OTAsImV4cCI6MjA3OTc0NTk5MH0.eff-1L5WqKXERPpoRYLbJUU7u5d3AdufpkUeNY'; 
         
@@ -65,7 +67,7 @@
         };
 
         // --- ICON COMPONENT VARIABLES ---
-        // FIX: Ensure these are defined using the helper
+        // FIX: All icons use the safeGetIcon helper to ensure they are available, preventing crashes.
         const LayoutDashboard = (props) => { const Icon = safeGetIcon('LayoutDashboard'); return <Icon {...props} />; };
         const Globe = (props) => { const Icon = safeGetIcon('Globe'); return <Icon {...props} />; };
         const Wrench = (props) => { const Icon = safeGetIcon('Wrench'); return <Icon {...props} />; };
@@ -908,7 +910,7 @@
                                 {isSupabaseInitialized ? 'Authenticating User...' : 'Loading Supabase Client...'}
                             </p>
                             {userId && (
-                                <p className="mt-4 text-xs text-gray-400">User ID: {userId}</p>
+                                <p className="mt-4 text-xs text-gray-400">UID: {userId}</p>
                             )}
                         </div>
                     );
