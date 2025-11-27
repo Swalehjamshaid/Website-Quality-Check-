@@ -148,7 +148,12 @@ def generate_report_python(url: str) -> Dict[str, Any]:
     }
 
 
-# --- API Endpoint ---
+# --- API Endpoints ---
+
+@app.get("/")
+def read_root():
+    """Temporary root endpoint to ensure the Vercel Serverless Function starts successfully."""
+    return {"status": "ok", "message": "QA API Server is active"}
 
 @app.post("/api/run_qa_test", response_model=FullReport)
 async def run_qa_test_api(client_data: ClientInput):
