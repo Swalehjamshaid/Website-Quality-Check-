@@ -5,15 +5,13 @@ import json
 import time
 
 # --- FastAPI and Pydantic Imports ---
-# You need to install these: pip install fastapi uvicorn pydantic
+# Make sure these are in your requirements.txt
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
-# The original code used fpdf2 and smtplib; we remove them as API functions won't use them directly.
 
 
 # --- Pydantic Data Models for API ---
-# Define the expected data structures for request and response
 
 class ClientInput(BaseModel):
     """Expected input from the React front-end."""
@@ -46,7 +44,7 @@ app.add_middleware(
 )
 
 
-# --- Core QA Logic (Adopted from your Streamlit code) ---
+# --- Core QA Logic ---
 
 def random_score(min_val, max_val):
     """Generates a random score between min_val and max_val (inclusive)."""
@@ -172,5 +170,6 @@ def health_check():
 # --- Uvicorn Server Command (for local testing/deployment) ---
 
 if __name__ == "__main__":
-    # To run locally, save as qa_api.py and execute: uvicorn qa_api:app --reload
+    import uvicorn
+    # To run locally, save as qa_api.py and execute: python -m uvicorn qa_api:app --reload
     uvicorn.run(app, host="0.0.0.0", port=8000)
