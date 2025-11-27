@@ -2,14 +2,14 @@
   "version": 2,
   "builds": [
     {
-      "src": "qa_api.py",
+      "src": "qa_streamlit_api.py",  <-- CHANGE HERE
       "use": "@vercel/python"
     }
   ],
   "routes": [
     {
       "src": "/api/.*",
-      "dest": "qa_api.py"
+      "dest": "qa_streamlit_api.py"  <-- CHANGE HERE
     },
     {
       "src": "/(.*)",
