@@ -33,7 +33,6 @@
         // =======================================================
         // ? SUPABASE KEYS and API ENDPOINT (FASTAPI Placeholder)
         // =======================================================
-        // NOTE: These keys are for the 'webquality' project and should be correct based on image_dbea24.jpg.
         const SUPABASE_URL = 'https://uytkmnbeafbplccmbabq.supabase.co'; 
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5dGttbmJlYWZicGxjY21iYWJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQxNjk5OTAsImV4cCI6MjA3OTc0NTk5MH0.eff-1L5WqKXERPpoRYLbJUU7u5d3AdufpkUeNY'; 
         
@@ -197,6 +196,7 @@
             <div className="fixed inset-0 bg-gray-900 bg-opacity-75 z-50 flex items-center justify-center p-4">
                 <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden transform transition-all border border-indigo-100">
                     <div className="flex justify-between items-center p-5 border-b border-indigo-50 bg-indigo-50/50">
+                        {/* FIX: Use TrendingUp icon in modal title */}
                         <h3 className="text-xl font-bold text-gray-800 flex items-center space-x-2"><TrendingUp size={24} className="text-indigo-600"/><span>{title}</span></h3>
                         <button onClick={onClose} className="text-gray-400 hover:text-indigo-600 transition p-1 rounded-full hover:bg-indigo-100">
                             <XCircle size={24} />
@@ -431,7 +431,8 @@
             
             if (error) {
                 console.error("Failed to add client:", error);
-                throw error;
+                // Throw the error to be caught by the calling function (handleAddClient)
+                throw error; 
             }
             return data.id;
         };
@@ -540,6 +541,7 @@
                     setIsModalOpen(false);
                 } catch (error) {
                     // Error is handled in addClient and logged
+                    // NOTE: If the save fails, we don't close the modal, allowing user to see the issue or try again.
                 } finally {
                     setIsAdding(false);
                 }
