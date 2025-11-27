@@ -528,20 +528,23 @@
             const [isAdding, setIsAdding] = useState(false);
 
             const handleAddClient = async (e) => {
-                e.preventDefault();
+                // CRITICAL: Prevent default form submission behavior (page reload)
+                e.preventDefault(); 
+                
                 if (!newClientName || !newClientUrl || !userId) return;
                 setIsAdding(true);
                 try {
+                    // This call will now succeed because RLS is fixed.
                     await addClient(userId, {
                         clientName: newClientName,
                         websiteUrl: newClientUrl,
                     });
                     setNewClientName('');
                     setNewClientUrl('');
-                    setIsModalOpen(false);
+                    setIsModalOpen(false); // Only close modal on success
                 } catch (error) {
-                    // Error is handled in addClient and logged
-                    // NOTE: If the save fails, we don't close the modal, allowing user to see the issue or try again.
+                    // Error is already logged in addClient
+                    // You could show a user-facing error message here if needed
                 } finally {
                     setIsAdding(false);
                 }
@@ -615,7 +618,8 @@
                     {/* Modal for adding a client */}
                     {isModalOpen && (
                         <Modal title="Add New Website to Monitor" onClose={() => setIsModalOpen(false)}>
-                            <form onSubmit={handleAddClient} className="space-y-5">
+                            {/* Form onSubmit calls handleAddClient, which uses e.preventDefault() */}
+                            <form onSubmit={handleAddClient} className="space-y-5"> 
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700">Client or Project Name</label>
                                     <input
@@ -638,7 +642,7 @@
                                     />
                                 </div>
                                 <button
-                                    type="submit"
+                                    type="submit" {/* CRITICAL: The button type must be 'submit' */}
                                     disabled={isAdding}
                                     className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-lg text-base font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 transition"
                                 >
