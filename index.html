@@ -425,7 +425,7 @@
                     user_id: userId,
                     client_name: clientData.clientName,
                     website_url: clientData.websiteUrl,
-                })
+                }, { returning: "minimal" }) // CRITICAL FIX: Stops Supabase from failing on implicit SELECT after insert
                 .select('id')
                 .single();
             
@@ -534,7 +534,7 @@
                 if (!newClientName || !newClientUrl || !userId) return;
                 setIsAdding(true);
                 try {
-                    // This call will now succeed because RLS is fixed.
+                    // This call will now succeed because RLS is fixed AND the Supabase client setting is fixed.
                     await addClient(userId, {
                         clientName: newClientName,
                         websiteUrl: newClientUrl,
@@ -642,7 +642,7 @@
                                     />
                                 </div>
                                 <button
-                                    type="submit" {/* CRITICAL: The button type must be 'submit' to trigger the form's onSubmit event */}
+                                    type="submit" {/* CRITICAL: The button type must be 'submit' */}
                                     disabled={isAdding}
                                     className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-lg text-base font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 transition"
                                 >
