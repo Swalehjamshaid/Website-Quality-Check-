@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>QA Autopilot Client</title>
     <style>
+        /* (Style section is omitted for brevity, use the previous styling) */
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; color: #333; margin: 0; padding: 20px; }
         .container { max-width: 900px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); }
         h1 { color: #007bff; text-align: center; }
@@ -18,7 +19,7 @@
         .score-card { display: flex; justify-content: space-around; flex-wrap: wrap; margin-bottom: 20px; }
         .score-item { text-align: center; padding: 15px; border-radius: 8px; margin: 5px; min-width: 120px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); }
         .score-label { font-size: 14px; color: #666; margin-bottom: 5px; text-transform: capitalize; }
-        .score-value { font-size: 24px; font-weight: bold; color: #007bff; }
+        .score-value { font-size: 24px; font-weight: bold; }
         .issues-list { list-style: none; padding-left: 0; }
         .issues-list li { background-color: #ffdddd; border-left: 5px solid #dc3545; padding: 10px; margin-bottom: 8px; border-radius: 4px; }
         .critical { background-color: #dc3545; color: white; }
@@ -57,7 +58,9 @@
     </div>
 
     <script>
-        const API_BASE_URL = 'http://127.0.0.1:8000'; // Make sure this matches your FastAPI server host/port
+        // CRITICAL CHANGE: API calls are now made to the relative path /api,
+        // which Vercel will route to your qa_api.py serverless function.
+        const API_ENDPOINT = '/api/run_qa_test'; 
 
         const urlInput = document.getElementById('website-url');
         const runBtn = document.getElementById('run-test-btn');
@@ -77,9 +80,9 @@
         function createScoreItem(label, score) {
             const colorClass = score >= 90 ? 'good' : (score >= 70 ? 'warn' : 'critical');
             return `
-                <div class="score-item ${colorClass}">
+                <div class="score-item">
                     <div class="score-label">${label}</div>
-                    <div class="score-value">${score}</div>
+                    <div class="score-value ${colorClass}">${score}</div>
                 </div>
             `;
         }
@@ -95,6 +98,8 @@
                     </tr>
                 `;
             }).join('');
+
+            if (!tableRows) return ''; // Skip if no metrics for this category
 
             return `
                 <h4>${categoryName.charAt(0).toUpperCase() + categoryName.slice(1)} Metrics</h4>
@@ -120,13 +125,12 @@
             reportOutput.style.display = 'none';
 
             try {
-                const response = await fetch(`${API_BASE_URL}/api/run_qa_test`, {
+                // Call the API endpoint using the relative path
+                const response = await fetch(API_ENDPOINT, { 
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        client_id: "web-client-123",
+                        client_id: "vercel-client",
                         website_url: url
                     })
                 });
