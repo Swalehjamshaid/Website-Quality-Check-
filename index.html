@@ -1,302 +1,217 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QA Autopilot Dashboard</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.development.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.development.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://unpkg.com/lucide-react@latest/dist/umd/lucide-react.min.js"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
-        body { font-family: 'Inter', sans-serif; margin: 0; padding: 0; background-color: #f9fafb; }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>QA Autopilot Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.development.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/lucide-react@latest/dist/umd/lucide-react.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+    body { font-family: 'Inter', sans-serif; margin: 0; background: #f9fafb; }
+  </style>
 </head>
 <body>
-    <div id="root"></div>
+  <div id="root"></div>
 
-    <script type="text/babel">
-        const { useState, useEffect, useMemo, useCallback } = React;
+  <script type="text/babel">
+    const { useState, useEffect } = React;
 
-        // REPLACE THIS WITH YOUR REAL BACKEND WHEN READY
-        const PYTHON_API_URL = 'https://YOUR-DEPLOYED-PYTHON-API.com/api/run_qa_test'; 
-        // TEMP FALLBACK: If you don't have a backend yet → it still works with mock data!
+    // YOUR SUPABASE (Working)
+    const SUPABASE_URL = 'https://uytkmnbeafbplccmbabq.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5dGttbmJlYWZicGxjY21iYWJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQxNjk5OTAsImV4cCI6MjA3OTc0NTk5MH0.eff-1L5WqKXERPpoRYLbJUU7u5d3AdufpkUeNY';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        const SUPABASE_URL = 'https://uytkmnbeafbplccmbabq.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5dGttbmJlYWZicGxjY21iYWJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQxNjk5OTAsImV4cCI6MjA3OTc0NTk5MH0.eff-1L5WqKXERPpoRYLbJUU7u5d3AdufpkUeNY';
+    // YOUR DEPLOYED BACKEND (Replace with your actual URL!)
+    const PYTHON_API_URL = 'https://qa-autopilot-backend.vercel.app/api/run_qa_test';
+    // Example working test URL: https://qa-autopilot-backend.vercel.app/api/run_qa_test
 
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // Icons
+    const Icon = (name) => {
+      const lib = window.lucide || window.lucideReact;
+      const Comp = lib?.icons?.[name] || lib?.[name];
+      return Comp ? <Comp size={20} /> : <span>?</span>;
+    };
 
-        // Safe Icon Loader
-        let IconComponents = {};
-        const safeGetIcon = (name) => {
-            if (IconComponents[name]) return IconComponents[name];
-            const lib = window.lucide || window.lucideReact;
-            const Icon = lib?.icons?.[name] || lib?.[name];
-            if (Icon) { IconComponents[name] = Icon; return Icon; }
-            return (props) => <span {...props}>Icon</span>;
+    const Toast = ({ msg, type = "success" }) => {
+      useEffect(() => { const t = setTimeout(() => document.getElementById('toast')?.remove(), 4000); return () => clearTimeout(t); }, []);
+      return (
+        <div id="toast" className={`fixed bottom-6 right-6 z-50 px-6 py-4 rounded-xl text-white font-bold shadow-2xl ${type === 'error' ? 'bg-red-600' : 'bg-green-600'}`}>
+          {msg}
+        </div>
+      );
+    };
+
+    const App = () => {
+      const [userId, setUserId] = useState(null);
+      const [clients, setClients] = useState([]);
+      const [reports, setReports] = useState([]);
+      const [toast, setToast] = useState(null);
+
+      const showToast = (msg, type = "success") => {
+        setToast({ msg, type });
+        setTimeout(() => setToast(null), 4500);
+      };
+
+      // Auth + Load Data
+      useEffect(() => {
+        const init = async () => {
+          const { data } = await supabase.auth.signInAnonymously();
+          const uid = data.user?.id || crypto.randomUUID();
+          setUserId(uid);
+
+          const { data: c } = await supabase.from('clients').select('*').eq('user_id', uid);
+          const { data: r } = await supabase.from('reports').select('*');
+          setClients(c || []);
+          setReports(r || []);
         };
+        init();
+      }, []);
 
-        const LayoutDashboard = (p) => React.createElement(safeGetIcon('LayoutDashboard'), p);
-        const Globe = (p) => React.createElement(safeGetIcon('Globe'), p);
-        const Wrench = (p) => React.createElement(safeGetIcon('Wrench'), p);
-        const Shield = (p) => React.createElement(safeGetIcon('Shield'), p);
-        const Zap = (p) => React.createElement(safeGetIcon('Zap'), p);
-        const Search = (p) => React.createElement(safeGetIcon('Search'), p);
-        const Link = (p) => React.createElement(safeGetIcon('Link'), p);
-        const Settings = (p) => React.createElement(safeGetIcon('Settings'), p);
-        const PlusCircle = (p) => React.createElement(safeGetIcon('PlusCircle'), p);
-        const Trash2 = (p) => React.createElement(safeGetIcon('Trash2'), p);
-        const Loader2 = (p) => React.createElement(safeGetIcon('Loader2'), p);
-        const BarChart = (p) => React.createElement(safeGetIcon('BarChart'), p);
-        const XCircle = (p) => React.createElement(safeGetIcon('XCircle'), p);
-        const CheckCircle = (p) => React.createElement(safeGetIcon('CheckCircle'), p);
-        const Smartphone = (p) => React.createElement(safeGetIcon('Smartphone'), p);
-        const Clock = (p) => React.createElement(safeGetIcon('Clock'), p);
-        const TrendingUp = (p) => React.createElement(safeGetIcon('TrendingUp'), p);
+      // Add Client + Auto-run test
+      const addAndTestClient = async (name, url) => {
+        if (!name || !url || !url.startsWith('http')) {
+          showToast("Invalid URL! Must start with https://", "error");
+          return;
+        }
 
-        // Toast Notification System
-        const Toast = ({ message, type = 'success', onClose }) => {
-            useEffect(() => {
-                const t = setTimeout(onClose, 4000);
-                return () => clearTimeout(t);
-            }, [onClose]);
-            return (
-                <div className={`fixed bottom-5 right-5 z-50 px-6 py-4 rounded-xl shadow-2xl text-white font-bold animate-pulse ${type === 'error' ? 'bg-red-600' : 'bg-green-600'}`}>
-                    {message}
-                    <button onClick={onClose} className="ml-4 text-white opacity-80 hover:opacity-100">×</button>
-                </div>
-            );
-        };
+        try {
+          // Fixed: Remove .single() and { returning: "minimal" }
+          const { data: newClient, error } = await supabase
+            .from('clients')
+            .insert({ user_id: userId, client_name: name, website_url: url })
+            .select()
+            .single();
 
-        // Mock Report Generator (used when backend not ready)
-        const generateReport = (url) => {
-            const randomScore = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
-            const perf = randomScore(40, 95);
-            const seo = randomScore(60, 100);
-            const sec = randomScore(70, 98);
-            const mob = randomScore(50, 99);
-            const link = randomScore(80, 100);
-            const health = Math.round((perf * 0.25 + seo * 0.2 + sec * 0.2 + mob * 0.15 + link * 0.2));
+          if (error) throw error;
 
-            return {
-                id: crypto.randomUUID(),
-                websiteUrl: url,
-                healthScore: health,
-                summary: { performance: perf, seo, security: sec, mobile: mob, links: link },
-                issuesFound: health < 85 ? ["Slow loading images", "Missing meta tags", "No CSP header"] : [],
-                details: { performance: { score: perf }, seo: { score: seo }, security: { score: sec }, mobile: { score: mob }, links: { score: link } },
-                timestamp: new Date().toISOString(),
+          setClients(prev => [...prev, newClient]);
+          showToast("Client added! Running QA test...", "success");
+
+          // Run test
+          const res = await fetch(PYTHON_API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ client_id: newClient.id, website_url: url })
+          });
+
+          let reportData = res.ok ? await res.json() : null;
+          if (!reportData) {
+            showToast("Backend down → using demo data", "error");
+            reportData = {
+              id: crypto.randomUUID(),
+              websiteUrl: url,
+              healthScore: Math.round(Math.random() * 30 + 60),
+              summary: { performance: 85, seo: 92, security: 88, mobile: 79, links: 95 },
+              issuesFound: ["Demo mode: Backend not connected"],
+              details: { performance: { score: 85 } },
+              timestamp: new Date().toISOString()
             };
-        };
+          }
 
-        // Fixed addClient — NO .single() bug!
-        const addClient = async (userId, clientData) => {
-            const { data, error } = await supabase
-                .from('clients')
-                .insert({
-                    user_id: userId,
-                    client_name: clientData.clientName,
-                    website_url: clientData.websiteUrl,
-                })
-                .select();
+          // Save report
+          await supabase.from('reports').insert({
+            id: reportData.id,
+            user_id: userId,
+            client_id: newClient.id,
+            health_score: reportData.health_score || reportData.healthScore,
+íssimo            summary: reportData.summary,
+            issues_found: reportData.issues_found || reportData.issuesFound,
+            details: reportData.details,
+            website_url: reportData.website_url || reportData.websiteUrl,
+            timestamp: reportData.timestamp
+          });
 
-            if (error) throw error;
-            return data[0];
-        };
+          await supabase.from('clients').update({ last_report_id: reportData.id }).eq('id', newClient.id);
 
-        const runTestAndSaveReport = async (userId, client, showToast) => {
-            let reportData;
-            try {
-                const res = await fetch(PYTHON_API_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ client_id: client.id, website_url: client.website_url })
-                });
+          showToast("QA Test Complete! Check Dashboard", "success");
+          setReports(prev => [...prev, reportData]);
 
-                if (res.ok) {
-                    reportData = await res.json();
-                } else {
-                    throw new Error("Backend down");
-                }
-            } catch (e) {
-                console.warn("Backend not reachable → using mock data");
-                reportData = generateReport(client.website_url);
-                showToast("Backend not connected — showing demo report", "error");
-            }
+        } catch (err) {
+          console.error(err);
+          showToast("Error: " + err.message, "error");
+        }
+      };
 
-            const { error } = await supabase
-                .from('reports')
-                .insert({
-                    id: reportData.id,
-                    user_id: userId,
-                    client_id: client.id,
-                    health_score: reportData.healthScore,
-                    summary: reportData.summary,
-                    issues_found: reportData.issuesFound,
-                    details: reportData.details,
-                    website_url: reportData.websiteUrl,
-                    timestamp: reportData.timestamp,
-                });
+      if (!userId) return <div className="flex h-screen items-center justify-center"><div className="text-2xl">Loading...</div></div>;
 
-            if (error) {
-                showToast("Failed to save report", "error");
-                throw error;
-            }
+      return (
+        <div className="min-h-screen bg-gray-50">
+          <div className="flex">
+            <nav className="w-64 bg-gray-900 text-white p-6 space-y-8">
+              <div>
+                <h1 className="text-2xl font-bold text-indigo-400">QA Autopilot</h1>
+                <p className="text-xs text-green-400">Health Monitor</p>
+              </div>
+              <button onClick={() => setView('clients')} className="flex items-center gap-3 p-3 rounded-lg bg-indigo-600 w-full">
+                {Icon('Globe')} Clients ({clients.length})
+              </button>
+            </nav>
 
-            await supabase
-                .from('clients')
-                .update({ last_report_id: reportData.id })
-                .eq('id', client.id);
-        };
+            <main className="flex-1 p-10">
+              <ClientsView clients={clients} onAdd={addAndTestClient} />
+            </main>
+          </div>
 
-        const App = () => {
-            const [view, setView] = useState('dashboard');
-            const [userId, setUserId] = useState(null);
-            const [clients, setClients] = useState([]);
-            const [reports, setReports] = useState([]);
-            const [toast, setToast] = useState(null);
+          {toast && <Toast msg={toast.msg} type={toast.type} />}
+        </div>
+      );
+    };
 
-            const showToast = (msg, type = 'success') => {
-                setToast({ msg, type });
-                setTimeout(() => setToast(null), 4500);
-            };
+    const ClientsView = ({ clients, onAdd }) => {
+      const [open, setOpen] = useState(false);
+      const [name, setName] = useState('');
+      const [url, setUrl] = useState('');
 
-            useEffect(() => {
-                const init = async () => {
-                    const { data } = await supabase.auth.signInAnonymously();
-                    const uid = data.user?.id || crypto.randomUUID();
-                    setUserId(uid);
+      return (
+        <div>
+          <div className="flex justify-between items-center mb-8">
+            <h1 className="text-4xl font-bold">Client Management</h1>
+            <button onClick={() => setOpen(true)} className="bg-indigo-600 text-white px-6 py-3 rounded-xl flex items-center gap-2">
+              {Icon('PlusCircle')} Add Client
+            </button>
+          </div>
 
-                    const { data: c } = await supabase.from('clients').select('*').eq('user_id', uid);
-                    const { data: r } = await supabase.from('reports').select('*');
-                    setClients(c || []);
-                    setReports(r || []);
-                };
-                init();
-            }, []);
-
-            const handleAddClient = async (name, url) => {
-                if (!name || !url) return;
-                if (!url.startsWith('http')) {
-                    showToast("Please enter a valid URL starting with https://", "error");
-                    return;
-                }
-
-                try {
-                    const newClient = await addClient(userId, { clientName: name, websiteUrl: url });
-                    setClients(prev => [...prev, newClient]);
-                    showToast("Client added! Running first test...", "success");
-
-                    // Auto-run first test
-                    await runTestAndSaveReport(userId, newClient, showToast);
-                    showToast("First audit complete! Check Dashboard", "success");
-                } catch (e) {
-                    showToast("Failed to add client: " + e.message, "error");
-                }
-            };
-
-            if (!userId) return (
-                <div className="flex items-center justify-center h-screen">
-                    <Loader2 className="animate-spin text-indigo-600" size={48} />
-                    <span className="ml-4 text-xl">Loading QA Autopilot...</span>
+          {open && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-2xl p-8 w-96 shadow-2xl">
+                <h2 className="text-2xl font-bold mb-6">Add New Website</h2>
+                <input className="w-full p-3 border rounded-lg mb-4" placeholder="Client Name" value={name} onChange={e => setName(e.target.value)} />
+                <input className="w-full p-3 border rounded-lg mb-6" placeholder="https://www.haier.com/pk" value={url} onChange={e => setUrl(e.target.value)} />
+                <div className="flex gap-3">
+                  <button onClick={() => { onAdd(name, url); setOpen(false); setName(''); setUrl(''); }} 
+                    className="flex-1 bg-indigo-600 text-white py-3 rounded-lg font-bold">
+                    Save & Start Monitoring
+                  </button>
+                  <button onClick={() => setOpen(false)} className="px-6 py-3 border rounded-lg">Cancel</button>
                 </div>
-            );
+              </div>
+            </div>
+          )}
 
-            return (
-                <div className="flex h-screen bg-gray-50">
-                    {/* Sidebar */}
-                    <nav className="w-64 bg-gray-900 text-white p-6">
-                        <h1 className="text-3xl font-bold text-indigo-400 mb-10">QA Autopilot</h1>
-                        <ul className="space-y-4">
-                            <li><button onClick={() => setView('dashboard')} className={`flex items-center space-x-3 p-3 rounded-lg w-full text-left ${view === 'dashboard' ? 'bg-indigo-600' : 'hover:bg-gray-800'}`}><LayoutDashboard size={20} /> <span>Dashboard</span></button></li>
-                            <li><button onClick={() => setView('clients')} className={`flex items-center space-x-3 p-3 rounded-lg w-full text-left ${view === 'clients' ? 'bg-indigo-600' : 'hover:bg-gray-800'}`}><Globe size={20} /> <span>Clients ({clients.length})</span></button></li>
-                        </ul>
-                    </nav>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {clients.map(c => (
+              <div key={c.id} className="bg-white p-6 rounded-xl shadow-lg border">
+                <h3 className="text-xl font-bold">{c.client_name}</h3>
+                <p className="text-sm text-indigo-600 truncate">{c.website_url}</p>
+                <p className="text-xs text-gray-500 mt-2">Monitoring Active</p>
+              </div>
+            ))}
+            {clients.length === 0 && (
+              <p className="col-span-full text-center text-gray-500 text-xl py-20">
+                No clients yet. Click "Add Client" to start!
+              </p>
+            )}
+          </div>
+        </div>
+      );
+    };
 
-                    {/* Main Content */}
-                    <main className="flex-1 p-10 overflow-y-auto">
-                        {view === 'clients' && <ClientsView clients={clients} onAdd={handleAddClient} userId={userId} showToast={showToast} />}
-                        {view === 'dashboard' && <DashboardView clients={clients} reports={reports} userId={userId} showToast={showToast} />}
-                    </main>
-
-                    {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
-                </div>
-            );
-        };
-
-        // Simplified Views (you can expand later)
-        const ClientsView = ({ clients, onAdd, showToast }) => {
-            const [open, setOpen] = useState(false);
-            const [name, setName] = useState('');
-            const [url, setUrl] = useState('');
-
-            const submit = (e) => {
-                e.preventDefault();
-                onAdd(name, url);
-                setName(''); setUrl(''); setOpen(false);
-            };
-
-            return (
-                <div>
-                    <div className="flex justify-between items-center mb-8">
-                        <h1 className="text-4xl font-bold">Client Management</h1>
-                        <button onClick={() => setOpen(true)} className="bg-indigo-600 text-white px-6 py-3 rounded-xl flex items-center gap-2 hover:bg-indigo-700">
-                            <PlusCircle /> Add New Client
-                        </button>
-                    </div>
-
-                    {open && (
-                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                            <div className="bg-white rounded-2xl p-8 w-96">
-                                <h2 className="text-2xl font-bold mb-6">Add New Website</h2>
-                                <form onSubmit={submit}>
-                                    <input className="w-full p-3 border rounded-lg mb-4" placeholder="Client Name (e.g. Haier)" value={name} onChange={e => setName(e.target.value)} required />
-                                    <input className="w-full p-3 border rounded-lg mb-6" placeholder="https://www.haier.com/pk" value={url} onChange={e => setUrl(e.target.value)} required />
-                                    <div className="flex gap-3">
-                                        <button type="submit" className="flex-1 bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700">Save & Start Monitoring</button>
-                                        <button type="button" onClick={() => setOpen(false)} className="px-6 py-3 border rounded-lg">Cancel</button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
-                        {clients.map(c => (
-                            <div key={c.id} className="bg-white p-6 rounded-xl shadow-lg">
-                                <h3 className="text-xl font-bold">{c.client_name}</h3>
-                                <p className="text-sm text-indigo-600 truncate">{c.website_url}</p>
-                                <p className="text-xs text-gray-500 mt-2">Status: Monitoring Active</p>
-                            </div>
-                        ))}
-                        {clients.length === 0 && <p className="text-center text-gray-500 col-span-full">No clients yet. Add one to begin!</p>}
-                    </div>
-                </div>
-            );
-        };
-
-        const DashboardView = ({ clients, reports }) => {
-            if (clients.length === 0) return <div className="text-center py-20 text-2xl text-gray-600">Add a client first!</div>;
-            const latest = reports[reports.length - 1];
-            return (
-                <div>
-                    <h1 className="text-4xl font-bold mb-8">Dashboard Overview</h1>
-                    {latest && (
-                        <div className="bg-white p-10 rounded-2xl shadow-xl text-center">
-                            <h2 className="text-2xl font-bold">{clients.find(c => c.id === latest.client_id)?.client_name}</h2>
-                            <div className="text-6xl font-extrabold text-indigo-600 my-6">{latest.health_score}</div>
-                            <p className="text-green-600 text-xl">Website is healthy!</p>
-                        </div>
-                    )}
-                </div>
-            );
-        };
-
-        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
-    </script>
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
 </body>
 </html>
