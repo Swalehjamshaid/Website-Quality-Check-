@@ -1,12 +1,4 @@
-{
-  "version": 2,
-  "builds": [
-    {
-      "src": "qa_api.py",
-      "use": "@vercel/python"
-    }
-  ],
-  "routes": [
+"routes": [
     {
       "src": "/api/(.*)",
       "dest": "qa_api.py"
@@ -16,4 +8,3 @@
       "dest": "index.html"
     }
   ]
-}
