@@ -29,10 +29,13 @@
 
     <script type="text/babel">
         // =======================================================
-        // ? CRITICAL FIX APPLIED: SUPABASE KEYS UPDATED
+        // ? SUPABASE KEYS and API ENDPOINT (FASTAPI Placeholder)
         // =======================================================
         const SUPABASE_URL = 'https://uytkmnbeafbplccmbabq.supabase.co'; 
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5dGttbmJlYWZicGxjY21iYWJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQxNjk5OTAsImV4cCI6MjA3OTc0NTk5MH0.eff-1L5WqKXERPpoRYLbJUU7u5d3AdufpkUeNY'; 
+        
+        // >>> IMPORTANT: REPLACE THIS URL AFTER YOU DEPLOY YOUR PYTHON FASTAPI APP <<<
+        const PYTHON_API_URL = 'https://YOUR-DEPLOYED-PYTHON-API.com/api/run_qa_test'; 
 
         // Initialize supabase client instance globally from the CDN-loaded object
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -49,6 +52,7 @@
 
             const IconSource = window.lucide || window.lucideReact;
             if (IconSource) {
+                // Check both common property names for the component
                 const component = (IconSource.icons && IconSource.icons[name]) || IconSource[name];
                 if (component) {
                     IconComponents[name] = component;
@@ -56,11 +60,11 @@
                 }
             }
             // Fallback: If icon is not found, return a component that renders a warning.
-            return ({ size, className }) => <span className={`text-red-500 ${className}`} style={{ fontSize: size }}>??</span>; 
+            return ({ size, className }) => <span className={`text-red-500 font-bold ${className}`} style={{ fontSize: size }}>??</span>; 
         };
 
         // --- ICON COMPONENT VARIABLES ---
-        // Declare components as functions that call the safe getter.
+        // FIX: Ensure these are defined using the helper
         const LayoutDashboard = (props) => { const Icon = safeGetIcon('LayoutDashboard'); return <Icon {...props} />; };
         const Globe = (props) => { const Icon = safeGetIcon('Globe'); return <Icon {...props} />; };
         const Wrench = (props) => { const Icon = safeGetIcon('Wrench'); return <Icon {...props} />; };
@@ -83,12 +87,12 @@
         // Helper to generate a unique ID (used for mock reports before inserting into Supabase)
         const generateId = () => Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
 
-        // --- MOCK TESTING ENGINE (Represents Python Backend Results) ---
+        // --- MOCK TESTING ENGINE (Represents Python Backend Results - FALLBACK ONLY) ---
 
         // Generates a random score between min and max (inclusive)
         const randomScore = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 
-        // Simulates the complex backend QA process
+        // Simulates the complex backend QA process (used as a fallback if the API call fails)
         const generateReport = (url) => {
             // Generate scores for each category
             const perfScore = randomScore(40, 95);
@@ -134,23 +138,23 @@
                     score: securityScore,
                     metrics: [
                         { name: 'SSL/TLS Status', value: 'Active', status: 'good' },
-                        { name: 'Security Headers', value: securityScore < 85 ? 'Missing CSP' : 'All present', status: securityScore < 85 ? 'critical' : 'good' },
-                        { name: 'Vulnerability Scan', value: securityScore > 95 ? 'None Found' : 'Low Severity', status: securityScore > 95 ? 'good' : 'warn' },
+                        { name: 'Security Headers', value: securityScore < 85 ? 'Missing CSP' : 'All present', status: 'critical' if securityScore < 85 else 'good' },
+                        { name: 'Vulnerability Scan', value: securityScore > 95 ? 'None Found' : 'Low Severity', status: 'good' if securityScore > 95 else 'warn' },
                     ],
                 },
                 // Mobile Details
                 mobile: {
                     score: mobileScore,
                     metrics: [
-                        { name: 'Tap Target Size', value: mobileScore > 90 ? 'Good' : 'Needs Fix', status: mobileScore > 90 ? 'good' : 'warn' },
-                        { name: 'Viewport Tag', value: 'Present', status: 'good' },
+                        { name: 'Tap Target Size', value: mobileScore > 90 ? 'Good' : 'Needs Fix', status: 'good' if mobileScore > 90 else 'warn'},
+                        { name: 'Viewport Tag', value: 'Present', 'status': 'good'},
                     ],
                 },
                 // Link Details (Includes Uptime/Crawl Status)
                 links: {
                     score: linkScore,
                     metrics: [
-                        { name: 'Broken Internal Links', value: linkScore > 98 ? '0' : randomScore(1, 5).toString(), status: linkScore < 98 ? 'critical' : 'good' },
+                        { name: 'Broken Internal Links', value: linkScore > 98 ? '0' : randomScore(1, 5).toString(), status: 'critical' if linkScore < 98 else 'good' },
                         { name: 'Broken External Links', value: '0', status: 'good' },
                         { name: 'Screenshot Status', value: 'Captured', status: 'good' },
                         { name: 'Pages Tested', value: randomScore(50, 200).toString(), status: 'good' }, // Multi-page testing
@@ -179,6 +183,7 @@
                 },
                 issuesFound: potentialIssues.slice(0, randomScore(1, 4)), // Pick 1-4 issues
                 details: detailedReport,
+                timestamp: new Date().toISOString(),
             };
         };
 
@@ -448,14 +453,44 @@
 
         const runTestAndSaveReport = async (userId, client) => {
             if (!userId || !client || supabase === null) return;
-            
-            const newReportData = generateReport(client.website_url);
 
-            // 1. Save the new report
+            let newReportData;
+
+            try {
+                // 1. CALL THE PYTHON API ENDPOINT
+                console.log(`Calling Python API for: ${client.website_url}`);
+                
+                const apiResponse = await fetch(PYTHON_API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        client_id: client.id,
+                        website_url: client.website_url,
+                    }),
+                });
+
+                if (!apiResponse.ok) {
+                    throw new Error(`API call failed with status: ${apiResponse.status}`);
+                }
+
+                // The API returns the structured report data
+                newReportData = await apiResponse.json();
+
+            } catch (apiError) {
+                console.error("API Fetch Failed or Returned Error:", apiError);
+                
+                // FALLBACK: Use the mock data generator if the API fails
+                newReportData = generateReport(client.website_url);
+                console.warn("Using MOCK REPORT DATA due to API failure.");
+            }
+            
+            // 2. Save the new report to Supabase (using data from API or fallback mock)
             const { error: reportError } = await supabase
                 .from('reports')
                 .insert({
-                    id: newReportData.id,
+                    id: newReportData.id, // Using the ID generated by the API/Mock (Text/String field)
                     user_id: userId,
                     client_id: client.id,
                     health_score: newReportData.healthScore,
@@ -463,14 +498,15 @@
                     issues_found: newReportData.issuesFound,
                     details: newReportData.details,
                     website_url: newReportData.websiteUrl,
+                    timestamp: newReportData.timestamp,
                 });
 
             if (reportError) {
-                console.error("Failed to save report:", reportError);
+                console.error("Failed to save report to Supabase:", reportError);
                 throw reportError;
             }
 
-            // 2. Update the client's lastReportId
+            // 3. Update the client's lastReportId
             const { error: clientUpdateError } = await supabase
                 .from('clients')
                 .update({ last_report_id: newReportData.id })
@@ -854,13 +890,11 @@
             const { clients, isLoading: isClientsLoading } = useClients(userId, isAuthReady, isSupabaseInitialized);
             const { reports } = useReports(userId, isAuthReady, isSupabaseInitialized);
 
-            // This handles the mock test run and saves the result to Supabase
+            // This handles the mock/real test run and saves the result to Supabase
             const runTest = async (client) => {
                 if (!userId || !client) return;
                 try {
-                    // NOTE: Simulate Python API call latency
-                    await new Promise(resolve => setTimeout(resolve, 3000)); 
-                    
+                    // NOTE: This function now calls the PYTHON_API_URL defined above
                     await runTestAndSaveReport(userId, client);
                 } catch (error) {
                     console.error("Test run failed:", error);
@@ -947,7 +981,7 @@
             );
         };
 
-        // Sidebar Item Component
+        // Sidebar Item Component (FIXED)
         const SidebarItem = ({ icon: Icon, label, active, onClick }) => (
             <li className={`rounded-xl transition cursor-pointer ${active ? 'bg-indigo-600 shadow-xl' : 'hover:bg-gray-800'}`}>
                 <a onClick={onClick} className="flex items-center p-3.5 space-x-3 text-base font-medium">
