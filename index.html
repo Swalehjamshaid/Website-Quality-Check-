@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>QA Autopilot Client</title>
     <style>
-        /* (Style section is omitted for brevity, use the previous styling) */
+        /* (Styling omitted for brevity, ensure you use the styles provided in the previous solutions) */
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; color: #333; margin: 0; padding: 20px; }
         .container { max-width: 900px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); }
         h1 { color: #007bff; text-align: center; }
@@ -58,8 +58,7 @@
     </div>
 
     <script>
-        // CRITICAL CHANGE: API calls are now made to the relative path /api,
-        // which Vercel will route to your qa_api.py serverless function.
+        // CRITICAL: This relative path is correctly handled by vercel.json
         const API_ENDPOINT = '/api/run_qa_test'; 
 
         const urlInput = document.getElementById('website-url');
@@ -99,7 +98,7 @@
                 `;
             }).join('');
 
-            if (!tableRows) return ''; // Skip if no metrics for this category
+            if (!tableRows) return '';
 
             return `
                 <h4>${categoryName.charAt(0).toUpperCase() + categoryName.slice(1)} Metrics</h4>
