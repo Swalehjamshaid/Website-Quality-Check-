@@ -1,7 +1,10 @@
-fastapi
-uvicorn
-pydantic
+Flask
 requests
 beautifulsoup4
-anyio
-starlette
+celery
+redis
+python-dotenv
+supabase-py
+psycopg2-binary
+weasyprint
+gunicorn
