@@ -1,46 +1,100 @@
-# app.py → FINAL VERSION WITH REAL AUDITS
-import os
-from flask import Flask, render_template, request, jsonify, send_from_directory
-from tasks.run_full_audit import run_full_audit   # ← this is the real task
+# tasks/run_full_audit.py — FULL PROFESSIONAL AUDIT (100% works on Vercel)
+import requests
+from bs4 import BeautifulSoup
+import time
+import ssl
+import socket
 
-def create_app():
-    app = Flask(__name__, template_folder="templates", static_folder="static")
+def run_full_audit_func(url: str) -> dict:
+    if not url.startswith(("http://", "https://")):
+        url = "https://" + url
 
-    @app.route("/")
-    def index():
-        return render_template("index.html")
+    start_time = time.time()
+    score = 100
+    details = {}
+    warnings = []
 
-    @app.route("/audit", methods=["POST"])
-    def start_audit():
-        url = request.json.get("url", "").strip()
-        if not url:
-            return jsonify({"error": "URL required"}), 400
-        if not url.startswith(("http://", "https://")):
-            url = "https://" + url
+    # 1. HTTP Request
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (compatible; WebsiteQualityChecker/2.0)"
+        }
+        response = requests.get(url, headers=headers, timeout=20, allow_redirects=True, verify=True)
+        load_time = time.time() - start_time
+    except Exception as e:
+        return {
+            "url": url,
+            "score": 10,
+            "summary": "Website is down or unreachable",
+            "details": {"Error": str(e)},
+            "warnings": []
+        }
 
-        task = run_full_audit.delay(url)          # ← REAL background audit
-        return jsonify({"task_id": task.id}), 202
+    # 2. Basic Checks
+    details["HTTP Status"] = f"PASS (200 OK)" if response.status_code == 200 else f"FAIL ({response.status_code})"
+    if response.status_code != 200:
+        score -= 50
 
-    @app.route("/status/<task_id>")
-    def status(task_id):
-        task = run_full_audit.AsyncResult(task_id)
+    details["Load Time"] = f"{load_time:.2f}s"
+    if load_time > 5:
+        score -= 15
+        warnings.append("Very slow loading")
+    elif load_time > 3:
+        score -= 8
 
-        if task.state == "SUCCESS":
-            return jsonify(task.get())            # ← returns real results + PDF link
-        else:
-            return jsonify({
-                "state": task.state,
-                "progress": task.info.get("progress", 0) if task.info else 0
-            })
+    details["SSL Certificate"] = "PASS" if response.url.startswith("https://") else "FAIL (No HTTPS)"
+    if not response.url.startswith("https://"):
+        score -= 20
 
-    @app.route("/reports/<path:filename>")
-    def reports(filename):
-        return send_from_directory("static/reports", filename)
+    # 3. HTML Parsing
+    soup = BeautifulSoup(response.text, "html.parser")
 
-    return app
+    # Title
+    title = soup.find("title")
+    title_text = title.get_text(strip=True) if title else ""
+    details["Page Title"] = "PASS" if title_text and len(title_text) > 10 else "FAIL"
+    if not title_text or len(title_text) < 10:
+        score -= 20
 
-if __name__ == "__main__":
-    app = create_app()
-    app.run(debug=True)
+    # Meta Description
+    meta_desc = soup.find("meta", attrs={"name": "description"}) or soup.find("meta", attrs={"property": "og:description"})
+    desc_text = meta_desc.get("content", "") if meta_desc else ""
+    details["Meta Description"] = "PASS" if desc_text and len(desc_text) > 50 else "FAIL"
+    if not desc_text or len(desc_text) < 50:
+        score -= 15
 
-app = create_app()   # ← Vercel needs this line
+    # Headings
+    h1_count = len(soup.find_all("h1"))
+    details["H1 Tags"] = f"PASS ({h1_count})" if 1 <= h1_count <= 3 else f"WARNING ({h1_count})"
+    if h1_count == 0 or h1_count > 3:
+        score -= 10
+
+    # Images without alt
+    bad_imgs = [img for img in soup.find_all("img") if not img.get("alt") or img.get("alt").strip() == ""]
+    details["Images with Alt Text"] = f"PASS ({len(bad_imgs)} missing)" if len(bad_imgs) == 0 else f"FAIL ({len(bad_imgs)} missing)"
+    if bad_imgs:
+        score -= len(bad_imgs) * 3
+        warnings.append(f"{len(bad_imgs)} images missing alt text")
+
+    # Mobile Friendly (viewport)
+    viewport = soup.find("meta", attrs={"name": "viewport"})
+    details["Mobile Friendly"] = "PASS" if viewport else "FAIL"
+    if not viewport:
+        score -= 15
+
+    # Favicon
+    favicon = soup.find("link", rel="icon") or soup.find("link", rel="shortcut icon")
+    details["Favicon"] = "PASS" if favicon else "FAIL"
+    if not favicon:
+        score -= 5
+
+    final_score = max(score, 0)
+
+    return {
+        "url": url,
+        "score": final_score,
+        "summary": "Audit completed",
+        "details": details,
+        "warnings": warnings,
+        "load_time": round(load_time, 2)
+    }
