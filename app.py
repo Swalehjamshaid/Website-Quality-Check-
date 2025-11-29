@@ -1,119 +1,79 @@
 import os
+import uuid
 from flask import Flask, render_template, request, jsonify, send_from_directory
 
-# Safe Supabase mock/fallback
-class MockSupabase:
-    def table(self, name):
-        return self
-    def insert(self, data):
-        return self
-    def execute(self):
-        return {'data': [], 'error': None}
+app = Flask(__name__, template_folder="templates", static_folder="static")
 
-supabase = MockSupabase()
-try:
-    if os.getenv("SUPABASE_URL") and os.getenv("SUPABASE_ANON_KEY"):
-        from supabase import create_client
-        supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_ANON_KEY"))
-except Exception as e:
-    print(f"Supabase init failed (using mock): {e}")
+# Simple in-memory storage (works perfectly on Vercel)
+results_store = {}
 
-# Safe Celery mock/fallback
-class MockCelery:
-    def delay(self, url):
-        # Run the audit immediately (sync for Vercel)
-        from tasks.run_full_audit import run_full_audit_func  # Direct function call
-        result = run_full_audit_func(url)
-        class MockTask:
-            id = 'mock-task-' + str(hash(url))
-        mock_task = MockTask()
-        mock_task.result = result
-        return mock_task
-    def AsyncResult(self, task_id):
-        class MockResult:
-            state = 'SUCCESS'
-            def get(self):
-                return self.result
-        return MockResult()
-
-celery = MockCelery()
-use_mock = os.getenv("USE_MOCK_CELERY", "true").lower() == "true"
-if not use_mock and os.getenv("CELERY_BROKER_URL") and 'localhost' not in os.getenv("CELERY_BROKER_URL"):
+# Your real audit function (direct call, no Celery needed)
+def run_real_audit(url):
     try:
-        from celery import Celery
-        celery = Celery(
-            'website_audit',
-            broker=os.getenv("CELERY_BROKER_URL"),
-            backend=os.getenv("CELERY_RESULT_BACKEND")
-        )
-        from tasks.run_full_audit import run_full_audit
+        from tasks.run_full_audit import run_full_audit_func
+        return run_full_audit_func(url)
     except Exception as e:
-        print(f"Celery init failed (using mock): {e}")
+        return {
+            "url": url,
+            "score": 15,
+            "summary": "Audit failed – server issue",
+            "details": {"error": str(e)}
+        }
 
-def create_app():
-    app = Flask(__name__, static_folder='static', template_folder='templates')
+@app.route("/")
+def index():
+    return render_template("index.html")
 
-    @app.route('/')
-    def index():
-        return render_template('index.html')
-
-    @app.route('/audit', methods=['POST'])
-    def start_audit():
+@app.route("/audit", methods=["POST"])
+def start_audit():
+    try:
         data = request.get_json() or {}
-        url = data.get('url', '').strip()
+        url = data.get("url", "").strip()
         if not url:
-            return jsonify({'error': 'URL required'}), 400
-        if not url.startswith(('http://', 'https://')):
-            url = 'https://' + url
+            return jsonify({"error": "Please enter a URL"}), 400
+        if not url.startswith(("http://", "https://")):
+            url = "https://" + url
 
-        # Use real Celery or mock
-        if use_mock:
-            task = celery.delay(url)
-        else:
-            task = run_full_audit.delay(url)
+        task_id = str(uuid.uuid4())
+        print(f"Starting audit for {url} → task {task_id}")
 
-        # Safe Supabase insert
+        # Run audit immediately (fast & reliable on Vercel)
+        result = run_real_audit(url)
+        result["task_id"] = task_id
+        results_store[task_id] = result
+
+        return jsonify({"task_id": task_id}), 202
+    except Exception as e:
+        return jsonify({"error": "Server error", "msg": str(e)}), 500
+
+@app.route("/status/<task_id>")
+def status(task_id):
+    try:
+        if task_id not in results_store:
+            return jsonify({"state": "PENDING"}), 200
+
+        result = results_store[task_id]
+        result["state"] = "SUCCESS"
+
+        # Generate PDF if you have the function
         try:
-            supabase.table('audits').insert({'url': url, 'task_id': task.id, 'status': 'pending'}).execute()
+            from tasks.reporting.report_generator import generate_pdf_report
+            pdf_path = generate_pdf_report(result)
+            result["report_url"] = f"/reports/{os.path.basename(pdf_path)}"
         except:
-            pass
+            result["report_url"] = None
 
-        return jsonify({'task_id': task.id}), 202
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"state": "FAILURE", "error": str(e)}), 500
 
-    @app.route('/status/<task_id>')
-    def get_task_status(task_id):
-        # Use real or mock
-        if use_mock:
-            task = celery.AsyncResult(task_id)
-        else:
-            task = run_full_audit.AsyncResult(task_id)
+@app.route("/reports/<path:filename>")
+def reports(filename):
+    try:
+        return send_from_directory("static/reports", filename, as_attachment=True)
+    except:
+        return "Report not found", 404
 
-        if task.state == 'SUCCESS':
-            result = task.get()
-            # Generate PDF
-            try:
-                from tasks.reporting.report_generator import generate_pdf_report
-                pdf_path = generate_pdf_report(result)
-                result['report_url'] = f'/reports/{os.path.basename(pdf_path)}'
-            except:
-                result['report_url'] = None
-            return jsonify(result)
-        return jsonify({'state': task.state, 'progress': task.info.get('progress', 0) if task.info else 0})
-
-    @app.route('/reports/<filename>')
-    def download_report(filename):
-        return send_from_directory('static/reports', filename, as_attachment=True)
-
-    @app.route('/health')
-    def health():
-        return jsonify({'status': 'ok', 'celery_mode': 'mock' if use_mock else 'real'})
-
-    return app
-
-# Local run
-if __name__ == '__main__':
-    app = create_app()
-    app.run(host='0.0.0.0', port=int(os.getenv('PORT', 5000)), debug=True)
-
-# VERCEL REQUIRES THIS TOP-LEVEL APP
-app = create_app()
+# Required for Vercel
+if __name__ != "__main__":
+    app = app
