@@ -5,13 +5,15 @@
       "src": "wsgi.py",
       "use": "@vercel/python",
       "config": {
-        "runtime": "python3.9", 
-        "maxLambdaSize": "30mb" 
+        "runtime": "python3.9",
+        "maxLambdaSize": "30mb"
       }
     }
   ],
   "routes": [
     {
+      // CRITICAL FIX: Route all traffic (both API and the main page) 
+      // to the WSGI entry point. Flask will then handle all paths internally.
       "src": "/(.*)",
       "dest": "wsgi.py"
     }
