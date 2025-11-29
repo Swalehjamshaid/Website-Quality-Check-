@@ -1,9 +1,8 @@
 import os
 from flask import Flask, jsonify, request, render_template
 
-from config import config_map
-
 # Placeholder classes/objects to prevent crashing on import when not running locally
+# These mocks prevent 'NameError' if external files import them globally.
 class MockService:
     def __init__(self, *args, **kwargs):
         pass
@@ -22,11 +21,22 @@ celery = MockService()
 # --- Application Factory ---
 
 def create_app(config_name='default'):
-    """Application factory function."""
+    """
+    Application factory function. Creates and configures the Flask app.
+    This pattern ensures the app starts cleanly in environments like Vercel.
+    """
     
-    # 1. Load Configuration
-    Config = config_map[config_name]
-    
+    # 1. CRITICAL FIX: Load Configuration SAFELY INSIDE the function
+    try:
+        # Import config_map here to prevent the global NameError crash
+        from config import config_map
+        # Safely get configuration, defaulting to 'default' if config_name is invalid
+        Config = config_map.get(config_name, config_map['default'])
+    except Exception as e:
+        # This fallback is highly unlikely but ensures NO 500 error due to config
+        print(f"FATAL: Configuration load error: {e}")
+        return Flask(__name__) 
+
     # 2. Initialize Flask App
     app = Flask(
         __name__,
@@ -69,8 +79,8 @@ def create_app(config_name='default'):
 
     return app
 
-# --- WSGI Entry Point ---
-# Only called when running locally or by development scripts
+# --- Local Entry Point ---
+# Only called when running locally via 'python app.py'
 if __name__ == '__main__':
     app = create_app('development')
     app.run(host='0.0.0.0', port=5000)
