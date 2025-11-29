@@ -1,31 +1,17 @@
+# app.py  ← FINAL VERSION THAT DOES REAL AUDITS
 import os
 from flask import Flask, render_template, request, jsonify, send_from_directory
 from supabase import create_client
-from celery import Celery
-from tasks.run_full_audit import run_full_audit  # ← this works because of __init__.py
+from tasks.run_full_audit import run_full_audit
 
-# Initialize Supabase
+# Supabase (make sure you have SUPABASE_ANON_KEY in Vercel env vars)
 supabase = create_client(
     os.getenv("SUPABASE_URL"),
-    os.getenv("SUPABASE_ANON_KEY")
-)
-
-# Initialize Celery
-celery_app = Celery(
-    "website_audit",
-    broker=os.getenv("CELERY_BROKER_URL"),
-    backend=os.getenv("CELERY_RESULT_BACKEND")
+    os.getenv("SUPABASE_ANON_KEY", "")
 )
 
 def create_app():
-    app = Flask(__name__, template_folder='templates', static_folder='static')
-    
-    # Load config
-    try:
-        from config import config_map
-        app.config.from_object(config_map.get(os.getenv("FLASK_CONFIG", "default")))
-    except:
-        pass  # fallback already in config.py
+    app = Flask(__name__, template_folder="templates", static_folder="static")
 
     @app.route("/")
     def index():
@@ -34,44 +20,50 @@ def create_app():
     @app.route("/audit", methods=["POST"])
     def start_audit():
         url = request.json.get("url", "").strip()
-        if not url.startswith("http"):
-            url"):
+        if not url:
+            return jsonify({"error": "URL required"}), 400
+        if not url.startswith(("http://", "https://")):
             url = "https://" + url
-        
-        task = run_full_audit.delay(url)  # Real background task
-        
-        # Save to Supabase
-        supabase.table("audits").insert({
-            "url": url,
-            "task_id": task.id,
-            "status": "pending"
-        }).execute()
-        
+
+        # This now runs the REAL audit in background
+        task = run_full_audit.delay(url)
+
+        # Save to Supabase (optional but nice)
+        try:
+            supabase.table("audits").insert({
+                "url": url,
+                "task_id": task.id,
+                "status": "pending"
+            }).execute()
+        except:
+            pass
+
         return jsonify({"task_id": task.id}), 202
 
     @app.route("/status/<task_id>")
-    def status(task_id):
-        task = run_full_audit.AsyncResult(task_id)
-        
-        if task.state == "SUCCESS":
-            result = task.get()
+    def get_status(task_id):
+        task_result = run_full_audit.AsyncResult(task_id)
+
+        if task_result.state == "PENDING":
+            return jsonify({"state": "PENDING", "progress": 10})
+        elif task_result.state == "PROGRESS":
+            return jsonify({"state": "PROGRESS", "progress": task_result.info})
+        elif task_result.state == "SUCCESS":
+            result = task_result.get()
             return jsonify(result)
-        
-        return jsonify({
-            "state": task.state,
-            "progress": task.info.get("progress", 0) if task.info else 0
-        })
+        else:
+            return jsonify({"state": task_result.state, "progress": 0})
 
     @app.route("/reports/<path:filename>")
-    def reports(filename):
-        return send_from_directory("static/reports", filename)
+    def serve_report(filename):
+        return send_from_directory("static/reports", filename, as_attachment=True)
 
     return app
 
-# Local run
+# Local development
 if __name__ == "__main__":
     app = create_app()
     app.run(debug=True, port=5000)
 
-# Vercel needs this
+# VERCEL NEEDS THIS LINE
 app = create_app()
