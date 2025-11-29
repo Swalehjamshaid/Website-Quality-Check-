@@ -37,6 +37,7 @@ def create_app(config_name='default'):
     except Exception as e:
         # This fallback prevents the server from returning a 500 error due to config file issues
         print(f"FATAL: Configuration load error: {e}")
+        # Return minimal app if config fails to prevent the 500
         return Flask(__name__) 
 
     # 2. Initialize Flask App
