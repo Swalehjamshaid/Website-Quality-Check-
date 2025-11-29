@@ -3,4 +3,4 @@ requests
 BeautifulSoup4
 celery
 redis
-gunicorn  # Highly recommended for deployment
+gunicorn  # Required for Vercel deployment
