@@ -1,60 +1,63 @@
-# tasks/run_full_audit.py — 100% Vercel compatible
-import requests
-from bs4 import BeautifulSoup
-import time
+# app.py — FINAL VERSION (real audits, real results, no mock text)
+import os
+import uuid
+from flask import Flask, render_template, request, jsonify, send_from_directory
 
-def run_full_audit_func(url):
+app = Flask(__name__, template_folder="templates", static_folder="static")
+results = {}
+
+@app.route("/")
+def index():
+    return render_template("index.html")
+
+@app.route("/audit", methods=["POST"])
+def start_audit():
     try:
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-        response = requests.get(url, headers=headers, timeout=15)
-        response.raise_for_status()
+        data = request.get_json() or {}
+        url = data.get("url", "").strip()
+        if not url:
+            return jsonify({"error": "URL required"}), 400
+        if not url.startswith(("http://", "https://")):
+            url = "https://" + url
+
+        task_id = str(uuid.uuid4())
+
+        # THIS LINE CALLS YOUR REAL AUDIT FUNCTION
+        from tasks.run_full_audit import run_full_audit_func
+        result = run_full_audit_func(url)
+
+        result["task_id"] = task_id
+        result["state"] = "SUCCESS"
+
+        # Try PDF
+        try:
+            from tasks.reporting.report_generator import generate_pdf_report
+            os.makedirs("static/reports", exist_ok=True)
+            pdf_path = generate_pdf_report(result)
+            new_name = f"static/reports/report_{task_id}.pdf"
+            os.replace(pdf_path, new_name)
+            result["report_url"] = f"/reports/report_{task_id}.pdf"
+        except:
+            result["report_url"] = None
+
+        results[task_id] = result
+        return jsonify({"task_id": task_id}), 202
+
     except Exception as e:
-        return {
-            "url": url,
-            "score": 10,
-            "summary": "Website unreachable",
-            "details": {"HTTP Status": f"FAIL – {str(e)}"}
-        }
+        return jsonify({"error": str(e)}), 500
 
-    soup = BeautifulSoup(response.text, 'html.parser')
-    title = soup.find("title")
-    meta_desc = soup.find("meta", attrs={"name": "description"}) or soup.find("meta", attrs={"property": "og:description"})
+@app.route("/status/<task_id>")
+def status(task_id):
+    if task_id not in results:
+        return jsonify({"state": "PENDING"}), 200
+    return jsonify(results[task_id])
 
-    score = 100
-    details = {}
+@app.route("/reports/<filename>")
+def download_report(filename):
+    try:
+        return send_from_directory("static/reports", filename, as_attachment=True)
+    except:
+        return "Not found", 404
 
-    # HTTP Status
-    if response.status_code == 200:
-        details["HTTP Status"] = "PASS (200 OK)"
-    else:
-        details["HTTP Status"] = f"FAIL ({response.status_code})"
-        score -= 40
-
-    # Title
-    if title and len(title.get_text(strip=True)) > 10:
-        details["SEO Title Present"] = "PASS"
-    else:
-        details["SEO Title Present"] = "FAIL (missing or too short)"
-        score -= 25
-
-    # Meta Description
-    if meta_desc and len(meta_desc.get("content", "")) > 50:
-        details["Meta Description"] = "PASS"
-    else:
-        details["Meta Description"] = "FAIL (missing or too short)"
-        score -= 20
-
-    # Response time
-    load_time = response.elapsed.total_seconds()
-    if load_time < 3:
-        details["Load Time"] = f"PASS ({load_time:.2f}s)"
-    else:
-        details["Load Time"] = f"SLOW ({load_time:.2f}s)"
-        score -= 10
-
-    return {
-        "url": url,
-        "score": max(score, 0),
-        "summary": "Audit completed",
-        "details": details
-    }
+# REQUIRED BY VERCEL
+app = app
