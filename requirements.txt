@@ -1,18 +1,6 @@
-# requirements.txt
-
-# Web Framework
-Flask==2.3.3
-gunicorn  # Recommended for production deployment
-
-# For asynchronous tasks (important for long-running quality checks)
-celery==5.3.6
-redis==5.0.1  # Common message broker for Celery
-
-# For making HTTP requests (used in quality checks)
-requests==2.31.0
-
-# Optional: For parsing HTML and finding broken links/SEO issues
-BeautifulSoup4==4.12.2
-
-# Optional: For structured logging (good practice)
-python-json-logger==2.0.7
+Flask
+requests
+BeautifulSoup4
+celery
+redis
+gunicorn  # Highly recommended for deployment
