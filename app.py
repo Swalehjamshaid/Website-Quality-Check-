@@ -1,51 +1,26 @@
-# app.py
-
 import os
-from flask import Flask, jsonify, request, render_template
 
-from config import config_map
-
-# 🚨 TEMPORARY: Define a placeholder for services that aren't running on Vercel
-# You will need to replace these with actual initialized objects later.
-# For now, let's just make sure the code doesn't crash on import.
-# Note: You need to set 'celery' and 'supabase' to None or a placeholder if other files import them.
-celery = None
-supabase = None
-
-def create_app(config_name='default'):
-    """Application factory function."""
+class Config(object):
+    """Base configuration class."""
     
-    # 1. Load Configuration
-    Config = config_map[config_name]
+    # Flask Security - MUST be set in Vercel Environment Variables
+    SECRET_KEY = os.environ.get('SECRET_KEY') or 'a-very-secret-fallback-key'
     
-    # 2. Initialize Flask App
-    app = Flask(
-        __name__,
-        static_folder='static',
-        template_folder='templates'
-    )
-    app.config.from_object(Config)
-
-    # 3. Register Routes
-    # NOTE: You must define your routes INSIDE this function or register them using blueprints.
+    # Celery Configuration - MUST be set in Vercel Environment Variables
+    CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL') or 'redis://localhost:6379/0'
+    CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND') or 'redis://localhost:6379/0'
     
-    @app.route('/')
-    def index():
-        return render_template('index.html')
+    # Supabase/API Configuration - MUST be set in Vercel Environment Variables
+    SUPABASE_URL = os.environ.get('SUPABASE_URL') or 'http://mock-supabase.com'
+    SUPABASE_SERVICE_KEY = os.environ.get('SUPABASE_SERVICE_KEY') or 'mock-key'
 
-    # 4. Register API Routes (Temporarily simple/mocked for deployment test)
-    # 🚨 This is the simplest possible version to test if the route works.
-    @app.route('/audit', methods=['POST'])
-    def start_audit():
-        return jsonify({'status': 'Mock audit started (Celery not running)', 'task_id': 'MOCKID'}), 202
 
-    @app.route('/status/<task_id>', methods=['GET'])
-    def get_task_status(task_id):
-        return jsonify({'state': 'SUCCESS', 'progress': 100, 'status': 'Mock Complete'}), 200
+class DevelopmentConfig(Config):
+    """Configuration for development environment."""
+    DEBUG = True
 
-    return app
 
-# If you need to run locally, call the factory function
-if __name__ == '__main__':
-    app = create_app('development')
-    app.run(host='0.0.0.0', port=5000)
+config_map = {
+    'development': DevelopmentConfig,
+    'default': DevelopmentConfig
+}
