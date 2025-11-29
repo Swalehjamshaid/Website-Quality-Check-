@@ -14,18 +14,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const url = urlInput.value;
         if (!url) return;
 
-        // Reset display
+        // Reset display and show status
         resultsContainer.innerHTML = '';
         statusMessage.textContent = 'Submitting audit request...';
-        statusMessage.classList.remove('hidden');
+        statusMessage.classList.remove('hidden', 'bg-red-100', 'text-red-700');
+        statusMessage.classList.add('bg-indigo-100', 'text-indigo-700');
 
         try {
-            // 1. Send URL to backend to start the audit
+            // 1. Send URL to backend (mocked /audit route)
             const response = await fetch('/audit', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ url }),
             });
 
@@ -41,10 +40,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } catch (error) {
             statusMessage.textContent = `Network error: ${error.message}`;
+            statusMessage.classList.replace('bg-indigo-100', 'bg-red-100');
+            statusMessage.classList.replace('text-indigo-700', 'text-red-700');
         }
     });
 
-    // Function to check task status repeatedly
+    // Function to check task status repeatedly (mocked /status route)
     function pollTaskStatus(taskId, url) {
         let intervalId;
 
@@ -60,13 +61,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (statusData.state === 'SUCCESS') {
                     statusMessage.textContent = `✅ Audit Complete! ID: ${statusData.audit_id}`;
+                    
+                    // Display mocked results on success
                     resultsContainer.innerHTML = `
-                        <h3 class="text-xl font-bold mt-4">Results Summary for ${url}</h3>
-                        <p>Detailed results would be fetched here using the Audit ID: ${statusData.audit_id}</p>
+                        <div class="result-card">
+                            <h3 class="text-xl font-bold mb-2 text-gray-800">Mock Audit Results for: ${url}</h3>
+                            <p class="text-gray-600 mb-4">Task ID: ${statusData.audit_id}</p>
+                            <div class="space-y-2">
+                                <div class="flex justify-between items-center border-b pb-1">
+                                    <span class="font-semibold">HTTP Status Check:</span>
+                                    <span class="status-pass">PASS (200 OK)</span>
+                                </div>
+                                <div class="flex justify-between items-center border-b pb-1">
+                                    <span class="font-semibold">SEO Title Present:</span>
+                                    <span class="status-pass">PASS</span>
+                                </div>
+                                <div class="flex justify-between items-center border-b pb-1">
+                                    <span class="font-semibold">Overall Score:</span>
+                                    <span class="text-2xl font-extrabold text-green-600">95/100</span>
+                                </div>
+                            </div>
+                        </div>
                     `;
-                    // NOTE: In a real app, you'd make an API call to fetch the final report data.
                 } else {
                     statusMessage.textContent = `❌ Audit Failed: ${statusData.status}`;
+                    statusMessage.classList.replace('bg-indigo-100', 'bg-red-100');
+                    statusMessage.classList.replace('text-indigo-700', 'text-red-700');
                 }
             }
         };
