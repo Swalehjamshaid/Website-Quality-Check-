@@ -5,8 +5,7 @@
       "src": "wsgi.py",
       "use": "@vercel/python",
       "config": {
-        // Explicitly set the start command to use gunicorn
-        "runtime": "python3.9", // Or your desired Python version
+        "runtime": "python3.9", 
         "maxLambdaSize": "30mb" 
       }
     }
