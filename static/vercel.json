@@ -2,14 +2,17 @@
   "version": 2,
   "builds": [
     {
-      "src": "app.py",
-      "use": "@vercel/python"
+      "src": "wsgi.py", // Direct Vercel to the new entry point
+      "use": "@vercel/python",
+      "config": {
+        "maxLambdaSize": "30mb" // Allows for a larger deployment package
+      }
     }
   ],
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "app.py"
+      "dest": "wsgi.py" // Route all web traffic through the WSGI entry point
     }
   ]
 }
