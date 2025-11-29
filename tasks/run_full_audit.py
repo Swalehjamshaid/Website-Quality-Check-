@@ -1,58 +1,46 @@
-# tasks/run_full_audit.py
-from celery import shared_task
-import requests
-from bs4 import BeautifulSoup
-from urllib.parse import urljoin, urlparse
-import time
+# app.py → FINAL VERSION WITH REAL AUDITS
 import os
-from tasks.reporting.report_generator import generate_pdf_report
+from flask import Flask, render_template, request, jsonify, send_from_directory
+from tasks.run_full_audit import run_full_audit   # ← this is the real task
 
-@shared_task(bind=True)
-def run_full_audit(self, url):
-    if not url.startswith("http"):
-        url = "https://" + url
-    
-    results = {
-        "url": url,
-        "score": 0,
-        "checks": {},
-        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
-    }
+def create_app():
+    app = Flask(__name__, template_folder="templates", static_folder="static")
 
-    try:
-        headers = {'User-Agent': 'Mozilla/5.0 (Website Quality Checker Bot)'}
-        response = requests.get(url, timeout=15, headers=headers)
-        response.raise_for_status()
-        soup = BeautifulSoup(response.text, 'html.parser')
+    @app.route("/")
+    def index():
+        return render_template("index.html")
 
-        # Basic Checks
-        results["checks"]["HTTP Status"] = f"PASS (200 OK)"
-        results["checks"]["Title"] = "PASS" if soup.title and soup.title.string else "FAIL (Missing)"
-        results["checks"]["Meta Description"] = "PASS" if soup.find("meta", attrs={"name": "description"}) else "FAIL"
-        results["checks"]["H1 Tag"] = "PASS" if soup.find("h1") else "FAIL (Missing)"
-        results["checks"]["Viewport Meta"] = "PASS" if soup.find("meta", attrs={"name": "viewport"}) else "FAIL"
-        results["checks"]["Canonical Tag"] = "PASS" if soup.find("link", rel="canonical") else "WARNING"
+    @app.route("/audit", methods=["POST"])
+    def start_audit():
+        url = request.json.get("url", "").strip()
+        if not url:
+            return jsonify({"error": "URL required"}), 400
+        if not url.startswith(("http://", "https://")):
+            url = "https://" + url
 
-        # Count images without alt
-        img_no_alt = len([img for img in soup.find_all("img") if not img.get("alt")])
-        results["checks"]["Images without alt"] = f"{img_no_alt} found"
+        task = run_full_audit.delay(url)          # ← REAL background audit
+        return jsonify({"task_id": task.id}), 202
 
-        # Simple scoring
-        passed = sum(1 for v in results["checks"].values() if "PASS" in str(v))
-        total = len(results["checks"])
-        results["score"] = round((passed / total) * 100, 1)
+    @app.route("/status/<task_id>")
+    def status(task_id):
+        task = run_full_audit.AsyncResult(task_id)
 
-        results["score"] = round((passed / total) * 100, 1)
+        if task.state == "SUCCESS":
+            return jsonify(task.get())            # ← returns real results + PDF link
+        else:
+            return jsonify({
+                "state": task.state,
+                "progress": task.info.get("progress", 0) if task.info else 0
+            })
 
-        # Generate PDF
-        pdf_path = generate_pdf_report(results)
-        results["report_url"] = f"/reports/{os.path.basename(pdf_path)}"
+    @app.route("/reports/<path:filename>")
+    def reports(filename):
+        return send_from_directory("static/reports", filename)
 
-    except Exception as e:
-        results["checks"]["Error"] = str(e)
-        results["score"] = 0
+    return app
 
-    # Update progress (optional)
-    self.update_state(state='PROGRESS', meta={'progress': 100})
+if __name__ == "__main__":
+    app = create_app()
+    app.run(debug=True)
 
-    return results
+app = create_app()   # ← Vercel needs this line
