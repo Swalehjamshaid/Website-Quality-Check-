@@ -1,24 +1,7 @@
-/* static/style.css */
-
 /* Custom styles to enhance the dashboard look */
 
 :root {
     --primary-color: #3b82f6; /* Tailwind blue-500 */
-    --text-color: #1f2937; /* Tailwind gray-800 */
-    --bg-color: #f9fafb; /* Tailwind gray-50 */
-}
-
-/* Style the main body/content area */
-.dashboard-content {
-    padding: 2rem;
-    max-width: 1200px;
-    margin: 0 auto;
-}
-
-/* Style the main heading/title */
-.text-indigo-600 {
-    font-weight: 700;
-    letter-spacing: -0.025em; /* Tighten up the text a bit */
 }
 
 /* Style for the card/widget that will show results */
@@ -28,11 +11,6 @@
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
     padding: 1.5rem;
     transition: transform 0.3s ease;
-}
-
-.result-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
 }
 
 /* Style for passing/failing status indicators */
