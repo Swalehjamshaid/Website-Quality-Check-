@@ -2,17 +2,19 @@
   "version": 2,
   "builds": [
     {
-      "src": "wsgi.py", // Direct Vercel to the new entry point
+      "src": "wsgi.py",
       "use": "@vercel/python",
       "config": {
-        "maxLambdaSize": "30mb" // Allows for a larger deployment package
+        // Explicitly set the start command to use gunicorn
+        "runtime": "python3.9", // Or your desired Python version
+        "maxLambdaSize": "30mb" 
       }
     }
   ],
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "wsgi.py" // Route all web traffic through the WSGI entry point
+      "dest": "wsgi.py"
     }
   ]
 }
