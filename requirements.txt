@@ -1,5 +1,9 @@
-Flask==3.0.3
-requests==2.32.3
-beautifulsoup4==4.12.3
-gunicorn==23.0.0
-weasyprint==62.3
+Flask==2.3.3
+gunicorn
+requests
+beautifulsoup4
+selenium==4.15.0
+webdriver-manager
+reportlab
+weasyprint
+# add any other packages you use in tasks/*
