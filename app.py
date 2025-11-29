@@ -1,8 +1,10 @@
 import os
 from flask import Flask, jsonify, request, render_template
 
-# Placeholder classes/objects to prevent crashing on import when not running locally
-# These mocks prevent 'NameError' if external files import them globally.
+# ──────────────────────────────────────────────────────────────
+# Mock services — they will be replaced at runtime if real ones exist
+# This prevents ImportError on Vercel when config fails to load real clients
+# ──────────────────────────────────────────────────────────────
 class MockService:
     def __init__(self, *args, **kwargs):
         pass
@@ -11,79 +13,106 @@ class MockService:
     def insert(self, data):
         return self
     def execute(self):
-        # Mock successful execution
         return {'data': [], 'error': None}
-    
-# Initialize global mocks for safety
-# NOTE: These must be imported by your tasks/reporting files if they use them globally.
+    def send(self, *args, **kwargs):
+        return self
+
+# Default to mocks
 supabase = MockService()
-celery = MockService() 
+celery = MockService()
 
+# ──────────────────────────────────────────────────────────────
+# Application Factory
+# ──────────────────────────────────────────────────────────────
+def create_app():
+    # Determine config name from Vercel environment variable
+    config_name = os.getenv("FLASK_CONFIG", "production").lower()
 
-# --- Application Factory ---
-
-def create_app(config_name='default'):
-    """
-    Application factory function. Creates and configures the Flask app.
-    This pattern ensures the app starts cleanly in environments like Vercel.
-    """
-    
-    # 1. CRITICAL FIX: Load Configuration SAFELY INSIDE the function
+    # Try to load real config, fall back safely if anything fails
     try:
-        # Import config_map here to prevent the global NameError crash
         from config import config_map
-        # Safely get configuration, defaulting to 'default' if config_name is invalid
-        Config = config_map.get(config_name, config_map['default'])
+        Config = config_map.get(config_name, config_map["default"])
     except Exception as e:
-        # This fallback prevents the server from returning a 500 error due to config file issues
-        print(f"FATAL: Configuration load error: {e}")
-        # Return minimal app if config fails to prevent the 500
-        return Flask(__name__) 
+        print(f"Config import failed: {e}, using minimal safe config")
+        class FallbackConfig:
+            DEBUG = False
+            TESTING = False
+            SECRET_KEY = os.getenv("SECRET_KEY", "fallback-secret")
+            SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+            CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "")
+        Config = FallbackConfig
 
-    # 2. Initialize Flask App
-    app = Flask(
-        __name__,
-        static_folder='static',
-        template_folder='templates'
-    )
+    # Create Flask app
+    app = Flask(__name__, static_folder='static', template_folder='templates')
     app.config.from_object(Config)
 
-    # 3. Register Routes
-    
+    # ── Initialize real services only if URLs are actually provided ──
+    try:
+        if os.getenv("SUPABASE_URL"):
+            from supabase import create_client
+            global supabase
+            supabase = create_client(
+                os.getenv("SUPABASE_URL"),
+                os.getenv("SUPABASE_ANON_KEY", "")  # add this in Vercel later if needed
+            )
+    except Exception as e:
+        print(f"Supabase init failed (mock used): {e}")
+
+    try:
+        if os.getenv("CELERY_BROKER_URL"):
+            from celery import Celery
+            global celery
+            celery = Celery(
+                app.name,
+                broker=os.getenv("CELERY_BROKER_URL"),
+                backend=os.getenv("CELERY_RESULT_BACKEND", os.getenv("CELERY_BROKER_URL"))
+            )
+    except Exception as e:
+        print(f"Celery init failed (mock used): {e}")
+
+    # ────────────────────── Routes ──────────────────────
     @app.route('/')
     def index():
-        """Renders the main dashboard page."""
         return render_template('index.html')
 
     @app.route('/audit', methods=['POST'])
     def start_audit():
-        """Mocked route to start the audit."""
-        data = request.get_json()
-        url = data.get('url', 'N/A')
-        
-        # In a real app, you would call: task = run_full_audit.delay(url)
+        data = request.get_json() or {}
+        url = data.get('url', '').strip()
+
+        if not url:
+            return jsonify({"error": "URL is required"}), 400
+
+        # In production you would do: run_full_audit.delay(url)
         return jsonify({
-            'status': 'Mock audit started',
-            'task_id': 'MOCKID-12345',
-            'url': url
+            "status": "Audit queued",
+            "task_id": "mock-task-12345",
+            "url": url
         }), 202
 
-    @app.route('/status/<task_id>', methods=['GET'])
+    @app.route('/status/<task_id>')
     def get_task_status(task_id):
-        """Mocked route to check the status."""
-        
-        # Mocks a successful completion instantly for testing the frontend flow
+        # Mock instant success for frontend testing
         return jsonify({
-            'state': 'SUCCESS',
-            'progress': 100,
-            'status': 'Mock Complete',
-            'audit_id': 'MOCK-AUDIT-ID'
-        }), 200
+            "task_id": task_id,
+            "state": "SUCCESS",
+            "progress": 100,
+            "status": "Audit completed (mock)",
+            "audit_id": "mock-audit-999"
+        })
+
+    @app.route('/health')
+    def health():
+        return jsonify({"status": "ok", "env": config_name})
 
     return app
 
-# --- Local Entry Point ---
-# Only called when running locally via 'python app.py'
+
+# ────────────────────── Entry Points ──────────────────────
+# Local development
 if __name__ == '__main__':
-    app = create_app('development')
-    app.run(host='0.0.0.0', port=5000)
+    app = create_app()
+    app.run(host='0.0.0.0', port=int(os.getenv("PORT", 5000)), debug=True)
+
+# VERCEL: This line is MANDATORY — creates the app instance Vercel expects
+app = create_app()
