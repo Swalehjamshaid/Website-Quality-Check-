@@ -2,10 +2,9 @@ Flask==3.0.3
 gunicorn==22.0.0
 supabase==2.0.0
 celery==5.3.6
-redis==5.0.1  # For Celery broker (update your env var to a real Redis URL)
+redis==5.0.1
 requests==2.31.0
 beautifulsoup4==4.12.2
 lxml==4.9.3
-googleChromeLighthouse==0.4.0  # For performance audits
-reportlab==4.0.4  # For PDF reports
-playwright==1.40.0  # For handling anti-bot sites
+lighthouse-python==0.0.2  # Real wrapper for Lighthouse (installs via pip)
+selenium==4.15.2  # For browser-based checks (use with Chrome driver)
