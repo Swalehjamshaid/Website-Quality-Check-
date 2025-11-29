@@ -6,5 +6,4 @@ redis==5.0.1
 requests==2.31.0
 beautifulsoup4==4.12.2
 lxml==4.9.3
-lighthouse-python==0.0.2  # Real wrapper for Lighthouse (installs via pip)
-selenium==4.15.2  # For browser-based checks (use with Chrome driver)
+reportlab==4.0.4
