@@ -7,8 +7,17 @@
     }
   ],
   "routes": [
-    { "src": "/static/(.*)", "dest": "/static/$1" },
-    { "src": "/reports/(.*)", "dest": "/reports/$1" },
-    { "src": "/(.*)", "dest": "Ap.py" }
+    {
+      "src": "/static/(.*)",
+      "dest": "Ap.py/static/$1"
+    },
+    {
+      "src": "/reports/(.*)",
+      "dest": "Ap.py/reports/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "Ap.py"
+    }
   ]
 }
