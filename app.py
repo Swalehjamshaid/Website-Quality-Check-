@@ -1,11 +1,10 @@
 import os
 import uuid
-from flask import Flask, render_template, request, jsonify, send_from_directory
+from flask import Flask, render_template, request, jsonify, send_from_directory, abort
 
 # THIS IS REQUIRED FOR VERCEL
 application = Flask(__name__, template_folder="templates", static_folder="static")
 app = application
-
 results = {}
 
 @app.route("/")
@@ -24,17 +23,13 @@ def start_audit():
             return jsonify({"error": "URL required"}), 400
         if not url.startswith("http"):
             url = "https://" + url
-
         task_id = str(uuid.uuid4())
-
         # ←←← LAZY IMPORT – THIS IS THE KEY FIX ←←←
-        from tasks.audit_engine import perform_real_audit   # moved inside the function
+        from tasks.audit_engine import perform_real_audit # moved inside the function
         result = perform_real_audit(url)
-
         result["task_id"] = task_id
         result["state"] = "SUCCESS"
         results[task_id] = result
-
         try:
             from tasks.reporting.report_generator import generate_pdf_report
             os.makedirs("static/reports", exist_ok=True)
@@ -46,9 +41,7 @@ def start_audit():
         except Exception as e:
             print("PDF error:", e)
             result["report_url"] = None
-
         return jsonify({"task_id": task_id}), 202
-
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -59,3 +52,8 @@ def status(task_id):
 @app.route("/reports/<filename>")
 def reports(filename):
     return send_from_directory("static/reports", filename, as_attachment=True)
+
+# Catch-all for 404s (optional, but helps debug)
+@app.errorhandler(404)
+def not_found(error):
+    return "Page not found", 404
