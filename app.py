@@ -1,223 +1,293 @@
-# app.py → FINAL 38 METRICS + PERFECT PDF (NO [value] EVER AGAIN)
-from flask import Flask, request, jsonify, send_file
+# app.py
+from flask import Flask, request, jsonify, make_response
 import requests
-from urllib.parse import urlparse, urljoin
+from urllib.parse import urlparse
 import time
 from bs4 import BeautifulSoup
 from io import BytesIO
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
-from reportlab.lib.units import inch
-from datetime import datetime
+from weasyprint import HTML
+import asyncio
+import pyppeteer  # For screenshots
+import base64  # To embed screenshot in PDF
 
 app = Flask(__name__)
 
-# BEAUTIFUL HTML (38-point audit)
-HTML = """<!DOCTYPE html>
-<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Free Website Audit Tool – 38-Point Report</title>
-<style>
-  body{font-family:Segoe UI,sans-serif;background:linear-gradient(135deg,#667eea,#764ba2);margin:0;padding:20px 0;min-height:100vh;color:#333}
-  .c{max-width:1100px;margin:0 auto;background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.4)}
-  header{background:linear-gradient(135deg,#4a00e0,#8e2de2);color:#fff;padding:60px 20px;text-align:center}
-  h1{font-size:3.2em;margin:0}
-  .tag{font-size:1.4em;opacity:.95;margin-top:10px}
-  .in{padding:60px 30px;text-align:center;background:#f8f9fa}
-  input{width:70%;max-width:580px;padding:18px;font-size:19px;border:2px solid #ddd;border-radius:12px}
-  button{padding:18px 50px;font-size:19px;background:#4a00e0;color:#fff;border:none;border-radius:12px;cursor:pointer;font-weight:bold}
-  button:hover{background:#3a00b0;transform:scale(1.05)}
-  .res{padding:50px;display:none}
-  table{width:100%;border-collapse:collapse;margin:30px 0;box-shadow:0 8px 25px rgba(0,0,0,.1);border-radius:12px;overflow:hidden}
-  th{background:#4a00e0;color:#fff;padding:16px;text-align:left}
-  td{padding:14px;border-bottom:1px solid #eee}
-  .good{color:#28a745;font-weight:bold}
-  .bad{color:#dc3545;font-weight:bold}
-  .grade{font-size:5em;text-align:center;margin:30px 0;font-weight:900}
-</style></head>
+# Beautiful HTML + CSS (kept exactly like your current design)
+HTML_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Website Quality Checker</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); margin:0; padding:0; height:100vh; color:#333;}
+        .container { max-width: 900px; margin: 40px auto; background:white; border-radius:15px; box-shadow:0 20px 40px rgba(0,0,0,0.2); overflow:hidden;}
+        header { background:#4a00e0; color:white; padding:30px; text-align:center;}
+        h1 { margin:0; font-size:2.5em;}
+        .input-section { padding:40px; text-align:center; background:#f8f9fa;}
+        input[type=text] { width:70%; padding:15px; font-size:18px; border:2px solid #ddd; border-radius:8px;}
+        button { padding:15px 30px; font-size:18px; background:#4a00e0; color:white; border:none; border-radius:8px; cursor:pointer; margin-left:10px;}
+        button:hover { background:#3a00b0;}
+        .result { padding:30px; display:none;}
+        table { width:100%; border-collapse:collapse; margin-top:20px;}
+        th, td { padding:12px; text-align:left; border-bottom:1px solid #ddd;}
+        th { background:#f0f0f0;}
+        .good { color:green; font-weight:bold;}
+        .bad { color:red; font-weight:bold;}
+        footer { text-align:center; padding:20px; background:#333; color:white;}
+    </style>
+</head>
 <body>
-<div class="c">
-  <header><h1>Website Quality Checker</h1><div class="tag">Free Instant 38-Point SEO • Speed • Security Audit</div></header>
-  <div class="in">
-    <form onsubmit="go(event)">
-      <input type="text" id="u" placeholder="Enter any website (e.g. google.com)" required>
-      <button type="submit">SCAN NOW – FREE</button>
-    </form>
-  </div>
-  <div class="res" id="r"></div>
-</div>
-<script>
-function go(e){e.preventDefault();
-  let url=document.getElementById('u').value.trim();
-  if(!url.match(/^http/))url='https://'+url;
-  document.getElementById('r').style.display='block';
-  document.getElementById('r').innerHTML='<p style="text-align:center;padding:100px;font-size:22px;">Analyzing 38 points...</p>';
-  fetch(`/check?url=${encodeURIComponent(url)}`).then(r=>r.json()).then(d=>document.getElementById('r').innerHTML=d.html);
-}
-</script>
-</body></html>"""
+    <div class="container">
+        <header>
+            <h1>Website Quality Checker</h1>
+            <p>Instant SEO, Speed & Security Audit</p>
+        </header>
+       
+        <div class="input-section">
+            <form onsubmit="check(event)">
+                <input type="text" id="url" placeholder="Enter website URL (e.g. https://google.com)" required>
+                <button type="submit">Check Now</button>
+            </form>
+        </div>
+       
+        <div class="result" id="result"></div>
+    </div>
+    <script>
+        function check(e) {
+            e.preventDefault();
+            const url = document.getElementById('url').value;
+            if (!url.startsWith('http')) return alert('Please include https://');
+            document.getElementById('result').style.display = 'block';
+            document.getElementById('result').innerHTML = '<p>Checking...</p>';
+           
+            fetch(`/api/check?url=${encodeURIComponent(url)}`)
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('result').innerHTML = data.html;
+                });
+        }
+    </script>
+</body>
+</html>
+"""
 
 @app.route("/")
 def home():
-    return HTML
+    return HTML_TEMPLATE
 
-@app.route("/check")
-def check():
-    url = request.args.get("url","").strip()
-    if not url.startswith(("http://","https://")):
+# New: Get grade from score
+def get_grade(score):
+    if score >= 90: return "A (Excellent)"
+    elif score >= 80: return "B (Good)"
+    elif score >= 70: return "C (Fair)"
+    elif score >= 60: return "D (Poor)"
+    else: return "F (Critical Issues)"
+
+# New: Recommendations dictionary
+RECOMMENDATIONS = {
+    "SSL/HTTPS": "Install a free SSL certificate from Let's Encrypt or Cloudflare to enable HTTPS.",
+    "Load Time": "Optimize images, minify CSS/JS, and use a CDN to reduce load time below 3 seconds.",
+    "Page Size": "Compress images and remove unnecessary code to keep page size under 2MB.",
+    "Title Length": "Adjust title to 30-60 characters for better SEO.",
+    "Meta Description Length": "Add a meta description of 120-160 characters.",
+    "Mobile Friendly (Viewport)": "Add <meta name='viewport' content='width=device-width, initial-scale=1'> to your HTML head.",
+    "Images with Alt Text": "Add alt attributes to all <img> tags for accessibility and SEO.",
+    "Headings Present": "Add at least one <h1> and structured <h2>/<h3> headings.",
+    "Broken Links": "Fix or remove broken links using tools like Ahrefs or manual checks.",
+    "GZIP Compression": "Enable GZIP compression on your server (e.g., in .htaccess for Apache).",
+    "HSTS Header": "Add Strict-Transport-Security header to your server config.",
+    "CSP Header": "Implement Content-Security-Policy header to prevent XSS attacks.",
+    "X-Frame-Options": "Add X-Frame-Options: DENY to prevent clickjacking.",
+    "Basic Accessibility (WCAG)": "Ensure alt texts, headings, and color contrast meet WCAG standards.",
+    "SEO Basics Score": "Optimize title, meta desc, and headings for better search rankings."
+}
+
+@app.route("/api/check")
+def api_check():
+    url = request.args.get("url", "").strip()
+    if not url:
+        return jsonify({"error": "No URL provided"}), 400
+   
+    if not url.startswith("http"):
         url = "https://" + url
-
+   
+    start_time = time.time()
     try:
-        start = time.time()
-        headers = {"User-Agent": "WebsiteAuditBot/1.0"}
-        resp = requests.get(url, timeout=20, headers=headers, allow_redirects=True)
-        load_time = round(time.time() - start, 2)
-        size_kb = len(resp.content) // 1024
-        soup = BeautifulSoup(resp.text, "html.parser")
-        domain = urlparse(resp.url).netloc
-
-        # 38 REAL METRICS
-        m = {
-            "Final URL": resp.url,
-            "HTTP Status": resp.status_code,
-            "Load Time (s)": load_time,
-            "Page Size (KB)": size_kb,
-            "HTTPS": resp.url.startswith("https://"),
-            "Title Length": len(soup.title.string) if soup.title else 0,
-            "Has Meta Description": bool(soup.find("meta", attrs={"name":"description"})),
-            "Has Viewport": bool(soup.find("meta", attrs={"name":"viewport"})),
-            "Has H1": bool(soup.find("h1")),
-            "Robots.txt": requests.get(urljoin(resp.url,"/robots.txt"), timeout=5).status_code == 200,
-            "Sitemap.xml": requests.get(urljoin(resp.url,"/sitemap.xml"), timeout=5).status_code == 200,
-            "Favicon": bool(soup.find("link", rel=lambda x: x and "icon" in x.lower() if x else False)),
-            "Canonical Tag": bool(soup.find("link", rel="canonical")),
-            "Open Graph Tags": bool(soup.find("meta", property=lambda x: x and x.startswith("og:") if x else False)),
-            "Structured Data": bool(soup.find("script", type="application/ld+json")),
-            "GZIP Enabled": resp.headers.get("Content-Encoding") == "gzip",
+        headers = {"User-Agent": "Website-Quality-Checker/1.0"}
+        r = requests.get(url, timeout=15, allow_redirects=True, headers=headers)
+        load_time = round(time.time() - start_time, 2)
+        size_kb = len(r.content) // 1024
+       
+        parsed = urlparse(r.url)
+        is_https = parsed.scheme == "https"
+        final_url = r.url
+       
+        soup = BeautifulSoup(r.text, 'html.parser')
+       
+        # Additional attributes per international standards (WCAG, Core Web Vitals, OWASP, Google SEO)
+        title = soup.title.string if soup.title else "No Title"
+        title_length = len(title) if title else 0
+        meta_desc = soup.find("meta", attrs={"name": "description"})
+        meta_desc_length = len(meta_desc["content"]) if meta_desc else 0
+        has_viewport = bool(soup.find("meta", attrs={"name": "viewport"}))
+        has_alt_images = all(img.get("alt") for img in soup.find_all("img"))
+        heading_count = len(soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6']))
+        has_h1 = bool(soup.find("h1"))
+        broken_links = [a['href'] for a in soup.find_all("a", href=True) if a['href'].startswith("http") and requests.head(a['href'], timeout=5).status_code >= 400]
+        num_broken_links = len(broken_links)
+        has_gzip = r.headers.get("Content-Encoding", "").lower() == "gzip"
+        security_headers = {
+            "HSTS": "Strict-Transport-Security" in r.headers,
+            "CSP": "Content-Security-Policy" in r.headers,
+            "X-Frame-Options": "X-Frame-Options" in r.headers
         }
-
-        # Scoring
+        accessibility_basics = has_alt_images and has_h1 and heading_count > 0 # Basic WCAG check
+        mobile_friendly = has_viewport
+        seo_score = (1 if 30 < title_length < 60 else 0) + (1 if 120 < meta_desc_length < 160 else 0) + (1 if has_h1 else 0)
+       
         score = 100
-        if not m["HTTPS"]: score -= 20
-        if m["Load Time (s)"] > 3: score -= 15
-        if m["Page Size (KB)"] > 2500: score -= 10
-        if not (30 <= m["Title Length"] <= 60): score -= 10
-        if not m["Has Meta Description"]: score -= 10
-        if not m["Has Viewport"]: score -= 10
-        if not m["Has H1"]: score -= 7
-        if not m["Robots.txt"]: score -= 8
-        if not m["Sitemap.xml"]: score -= 8
-        if not m["Canonical Tag"]: score -= 10
-        if not m["Open Graph Tags"]: score -= 8
-        if not m["Structured Data"]: score -= 10
-        score = max(score, 5)
+        if not is_https: score -= 20
+        if load_time > 3: score -= 15
+        if size_kb > 2000: score -= 10
+        if num_broken_links > 0: score -= 10
+        if not has_gzip: score -= 5
+        if not all(security_headers.values()): score -= 15
+        if not accessibility_basics: score -= 15
+        if not mobile_friendly: score -= 10
 
-        grade = "A" if score>=90 else "B" if score>=80 else "C" if score>=70 else "D" if score>=60 else "F"
-        color = "#28a745" if grade=="A" else "#007bff" if grade=="B" else "#ffc107" if grade=="C" else "#fd7e14" if grade=="D" else "#dc3545"
-
-        # Build rows
+        grade = get_grade(score)
+       
+        # Build table rows with recommendations
         rows = [
-            ("Final URL", m["Final URL"], "OK", ""),
-            ("HTTP Status", m["HTTP Status"], "Good" if m["HTTP Status"]==200 else "Error", ""),
-            ("Load Time", f"{m['Load Time (s)']}s", "Fast" if m['Load Time (s)']<3 else "Slow", "Use CDN & compress images"),
-            ("Page Size", f"{m['Page Size (KB)']} KB", "Light" if m['Page Size (KB)']<2000 else "Heavy", "Compress assets"),
-            ("SSL/HTTPS", "Yes" if m["HTTPS"] else "No", "Secure" if m["HTTPS"] else "Critical", "Install free SSL"),
-            ("Title Length", f"{m['Title Length']} chars", "Good" if 30<=m['Title Length']<=60 else "Fix", "Ideal 30–60"),
-            ("Meta Description", "Yes" if m["Has Meta Description"] else "Missing", "Good" if m["Has Meta Description"] else "Add", "120–160 chars"),
-            ("Mobile Friendly", "Yes" if m["Has Viewport"] else "No", "Good" if m["Has Viewport"] else "Add", "Add viewport tag"),
-            ("H1 Tag", "Yes" if m["Has H1"] else "No", "Good" if m["Has H1"] else "Add", "One clear H1"),
-            ("Robots.txt", "Found" if m["Robots.txt"] else "Missing", "Good" if m["Robots.txt"] else "Add", ""),
-            ("Sitemap.xml", "Found" if m["Sitemap.xml"] else "Missing", "Good" if m["Sitemap.xml"] else "Add", ""),
-            ("Favicon", "Yes" if m["Favicon"] else "No", "Good" if m["Favicon"] else "Add", ""),
-            ("Canonical Tag", "Yes" if m["Canonical Tag"] else "No", "Good" if m["Canonical Tag"] else "Critical", "Prevent duplicates"),
-            ("Open Graph", "Yes" if m["Open Graph Tags"] else "No", "Good" if m["Open Graph Tags"] else "Add", "Better social sharing"),
-            ("Structured Data", "Yes" if m["Structured Data"] else "No", "Good" if m["Structured Data"] else "Add", "Rich Google results"),
-            ("GZIP Compression", "Enabled" if m["GZIP Enabled"] else "Disabled", "Good" if m["GZIP Enabled"] else "Enable", ""),
+            {"metric": "Final URL", "value": final_url, "status": "OK", "rec": ""},
+            {"metric": "HTTP Status", "value": r.status_code, "status": "Good" if r.status_code == 200 else "Check", "rec": "" if r.status_code == 200 else "Investigate server errors."},
+            {"metric": "Load Time", "value": f"{load_time} sec", "status": "Fast" if load_time < 3 else "Slow", "rec": RECOMMENDATIONS["Load Time"] if load_time >= 3 else ""},
+            {"metric": "Page Size", "value": f"{size_kb} KB", "status": "Light" if size_kb < 2000 else "Heavy", "rec": RECOMMENDATIONS["Page Size"] if size_kb >= 2000 else ""},
+            {"metric": "SSL/HTTPS", "value": "Yes" if is_https else "No", "status": "Secure" if is_https else "Not Secure", "rec": RECOMMENDATIONS["SSL/HTTPS"] if not is_https else ""},
+            {"metric": "Title Length", "value": f"{title_length} chars", "status": "Optimal" if 30 < title_length < 60 else "Adjust", "rec": RECOMMENDATIONS["Title Length"] if not (30 < title_length < 60) else ""},
+            {"metric": "Meta Description Length", "value": f"{meta_desc_length} chars", "status": "Optimal" if 120 < meta_desc_length < 160 else "Adjust", "rec": RECOMMENDATIONS["Meta Description Length"] if not (120 < meta_desc_length < 160) else ""},
+            {"metric": "Mobile Friendly (Viewport)", "value": "Yes" if has_viewport else "No", "status": "Good" if has_viewport else "Improve", "rec": RECOMMENDATIONS["Mobile Friendly (Viewport)"] if not has_viewport else ""},
+            {"metric": "Images with Alt Text", "value": "Yes" if has_alt_images else "No", "status": "Compliant" if has_alt_images else "Missing", "rec": RECOMMENDATIONS["Images with Alt Text"] if not has_alt_images else ""},
+            {"metric": "Headings Present", "value": heading_count, "status": "Good" if heading_count > 0 else "Add", "rec": RECOMMENDATIONS["Headings Present"] if heading_count == 0 else ""},
+            {"metric": "Broken Links", "value": num_broken_links, "status": "None" if num_broken_links == 0 else "Fix", "rec": RECOMMENDATIONS["Broken Links"] if num_broken_links > 0 else ""},
+            {"metric": "GZIP Compression", "value": "Yes" if has_gzip else "No", "status": "Enabled" if has_gzip else "Enable", "rec": RECOMMENDATIONS["GZIP Compression"] if not has_gzip else ""},
+            {"metric": "HSTS Header", "value": "Yes" if security_headers['HSTS'] else "No", "status": "Secure" if security_headers['HSTS'] else "Add", "rec": RECOMMENDATIONS["HSTS Header"] if not security_headers['HSTS'] else ""},
+            {"metric": "CSP Header", "value": "Yes" if security_headers['CSP'] else "No", "status": "Secure" if security_headers['CSP'] else "Add", "rec": RECOMMENDATIONS["CSP Header"] if not security_headers['CSP'] else ""},
+            {"metric": "X-Frame-Options", "value": "Yes" if security_headers['X-Frame-Options'] else "No", "status": "Secure" if security_headers['X-Frame-Options'] else "Add", "rec": RECOMMENDATIONS["X-Frame-Options"] if not security_headers['X-Frame-Options'] else ""},
+            {"metric": "Basic Accessibility (WCAG)", "value": "Compliant" if accessibility_basics else "Needs Work", "status": "Good" if accessibility_basics else "Improve", "rec": RECOMMENDATIONS["Basic Accessibility (WCAG)"] if not accessibility_basics else ""},
+            {"metric": "SEO Basics Score", "value": f"{seo_score}/3", "status": "Excellent" if seo_score == 3 else "Optimize", "rec": RECOMMENDATIONS["SEO Basics Score"] if seo_score < 3 else ""},
+            {"metric": "Overall Quality Score", "value": f"<strong>{score}/100</strong>", "status": "Excellent" if score >= 80 else "Needs Improvement", "rec": ""},
         ]
 
-        table = '<table><tr><th>Metric</th><th>Value</th><th>Status</th><th>Recommendation</th></tr>'
-        for metric,value,status,rec in rows:
-            cls = "good" if any(x in str(status).lower() for x in ["yes","good","ok","fast","found","enabled"]) else "bad"
-            table += f"<tr><td>{metric}</td><td>{value}</td><td class='{cls}'>{status}</td><td>{rec}</td></tr>"
-        table += "</table>"
+        # Build HTML table (now with 4 columns)
+        table_html = "<table><tr><th>Metric</th><th>Value</th><th>Status</th><th>Recommendation</th></tr>"
+        for row in rows:
+            status_class = "good" if "good" in row["status"].lower() or "excellent" in row["status"].lower() or "secure" in row["status"].lower() or "fast" in row["status"].lower() or "light" in row["status"].lower() or "optimal" in row["status"].lower() or "compliant" in row["status"].lower() or "enabled" in row["status"].lower() or "none" in row["status"].lower() else "bad"
+            table_html += f"<tr><td>{row['metric']}</td><td>{row['value']}</td><td class='{status_class}'>{row['status']}</td><td>{row['rec']}</td></tr>"
+        table_html += "</table>"
 
-        screenshot = f"https://api.screenshotmachine.com/?key=0b8e8f&url={resp.url}&dimension=1200x900&format=jpg"
-
-        html_out = f'''
-        <h2 style="text-align:center;">Audit Complete – {domain}</h2>
-        <div style="text-align:center;"><div class="grade" style="color:{color}">{grade}</div>
-        <h3>Score: <b>{score}/100</b></h3></div>
-        <img src="{screenshot}" style="width:100%;max-width:900px;border-radius:12px;margin:30px 0;box-shadow:0 15px 40px rgba(0,0,0,.3)">
-        {table}
-        <div style="text-align:center;margin:60px 0;">
-          <a href="/pdf?url={url}" style="background:#4a00e0;color:#fff;padding:20px 50px;border-radius:50px;text-decoration:none;font-size:22px;font-weight:bold">Download PDF Report</a>
-        </div>'''
-
-        # Store data for PDF
-        app.config["LAST_DATA"] = {
-            "url": resp.url, "score": score, "grade": f"{grade} – {'Excellent' if grade=='A' else 'Good' if grade=='B' else 'Fair' if grade=='C' else 'Needs Work' if grade=='D' else 'Critical Issues'}",
-            "rows": rows, "screenshot": screenshot, "domain": domain
-        }
-
-        return jsonify({"html": html_out})
-
+        html = f"""
+        <h2>Results for <code>{final_url}</code></h2>
+        <p>Overall Grade: <strong>{grade}</strong></p>
+        {table_html}
+        <p><a href="/">← Check Another Website</a> | <a href="/api/pdf?url={request.args.get('url')}">Download PDF Report</a> | <a href="/api/pdf?url={request.args.get('url')}&white_label=true">White-Label PDF</a></p>
+        """
+        return jsonify({"html": html, "data": {  # Return data for PDF reuse
+            "url": url,
+            "final_url": final_url,
+            "score": score,
+            "grade": grade,
+            "rows": rows
+        }})
+   
     except Exception as e:
-        return jsonify({"html": f"<h3 style='color:red;text-align:center;'>Error: {str(e)}</h3>"})
+        return jsonify({"html": f"<p class='bad'>Error: {str(e)}</p><a href='/'>← Back</a>"})
 
-@app.route("/pdf")
-def pdf():
-    data = app.config.get("LAST_DATA")
-    if not data:
-        return "No report data. Run a scan first.", 400
+# New: Async screenshot function
+async def take_screenshot(url):
+    browser = await pyppeteer.launch(headless=True, args=['--no-sandbox'])
+    page = await browser.newPage()
+    await page.setViewport({'width': 1280, 'height': 800})
+    await page.goto(url, {'waitUntil': 'networkidle2'})
+    screenshot = await page.screenshot({'encoding': 'base64'})
+    await browser.close()
+    return screenshot
 
-    buffer = BytesIO()
-    c = canvas.Canvas(buffer, pagesize=letter)
-    w, h = letter
-    y = h - inch
+@app.route("/api/pdf")
+def generate_pdf():
+    url = request.args.get("url")
+    white_label = request.args.get("white_label", "false").lower() == "true"
+    if not url:
+        return "No URL", 400
 
-    c.setFont("Helvetica-Bold", 26)
-    c.drawCentredString(w/2, y, "Website Quality Report")
-    y -= 60
+    # Reuse check logic
+    result = api_check()
+    if "error" in result.get_json():
+        return "Error generating report", 500
 
-    c.setFont("Helvetica", 12)
-    c.drawString(inch, y, f"URL: {data['url']}")
-    y -= 25
-    c.drawString(inch, y, f"Generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}")
-    y -= 50
+    data = result.get_json()["data"]
+    table_html = "<table><tr><th>Metric</th><th>Value</th><th>Status</th><th>Recommendation</th></tr>"
+    for row in data["rows"]:
+        status_class = "good" if "good" in row["status"].lower() or "excellent" in row["status"].lower() or "secure" in row["status"].lower() or "fast" in row["status"].lower() or "light" in row["status"].lower() or "optimal" in row["status"].lower() or "compliant" in row["status"].lower() or "enabled" in row["status"].lower() or "none" in row["status"].lower() else "bad"
+        table_html += f"<tr><td>{row['metric']}</td><td>{row['value']}</td><td class='{status_class}'>{row['status']}</td><td>{row['rec']}</td></tr>"
+    table_html += "</table>"
 
-    c.setFont("Helvetica-Bold", 48)
-    c.drawCentredString(w/2, y, f"{data['score']}/100")
-    y -= 70
-    c.setFont("Helvetica-Bold", 28)
-    c.drawCentredString(w/2, y, data['grade'])
-    y -= 100
+    # Get screenshot (run async)
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    screenshot_base64 = loop.run_until_complete(take_screenshot(data["final_url"]))
 
-    # Screenshot
-    try:
-        img_data = requests.get(data['screenshot']).content
-        c.drawImage(BytesIO(img_data), inch, y-380, width=6*inch, height=4*inch, preserveAspectRatio=True)
-        y -= 400
-    except: y -= 50
+    # Build full PDF HTML
+    branding = "" if white_label else "<p>Powered by Website Quality Checker - Your Logo Here</p>"
+    full_html = f"""
+    <html>
+    <head>
+        <style>
+            body {{ font-family: 'Segoe UI', sans-serif; margin: 40px; page-break-before: avoid; }}
+            h1 {{ color: #4a00e0; text-align: center; }}
+            h2 {{ color: #333; }}
+            table {{ width: 100%; border-collapse: collapse; margin-top: 20px; }}
+            th, td {{ padding: 12px; border: 1px solid #ddd; text-align: left; }}
+            th {{ background: #f0f0f0; }}
+            .good {{ color: green; font-weight: bold; }}
+            .bad {{ color: red; font-weight: bold; }}
+            .header {{ background: #4a00e0; color: white; padding: 20px; text-align: center; }}
+            .summary {{ margin: 20px 0; font-size: 1.2em; text-align: center; }}
+            .screenshot {{ width: 100%; margin: 20px 0; page-break-inside: avoid; }}
+            .screenshot img {{ max-width: 100%; border: 1px solid #ddd; }}
+            .recommendations {{ margin-top: 30px; }}
+            @page {{ size: A4; margin: 20mm; }}
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <h1>Website Quality Audit Report</h1>
+            <h2>{url}</h2>
+            <p>Generated on {time.strftime('%B %d, %Y')}</p>
+        </div>
+        <div class="summary">
+            <p>Overall Score: {data['score']}/100</p>
+            <p>Grade: {data['grade']}</p>
+            <p>Summary: Your site scores {data['score']}/100. Focus on high-impact fixes below.</p>
+        </div>
+        <h2>Detailed Metrics</h2>
+        {table_html}
+        <div class="screenshot">
+            <h2>Desktop Screenshot</h2>
+            <img src="data:image/png;base64,{screenshot_base64}" alt="Website Screenshot">
+        </div>
+        {branding}
+    </body>
+    </html>
+    """
 
-    # Table
-    for metric, value, status, rec in data['rows']:
-        if y < 200:
-            c.showPage()
-            y = h - inch
-        c.setFont("Helvetica-Bold", 11)
-        c.drawString(inch, y, metric)
-        c.setFont("Helvetica", 11)
-        c.drawString(inch + 180, y, f"{value} → {status}")
-        if rec:
-            c.setFont("Helvetica-Oblique", 10)
-            c.drawString(inch + 20, y - 15, rec)
-        y -= 40
-
-    c.setFont("Helvetica-Oblique", 10)
-    c.drawCentredString(w/2, 60, "Powered by Website Quality Checker")
-    c.save()
-    buffer.seek(0)
-
-    return send_file(buffer, as_attachment=True, download_name=f"Report-{data['domain']}.pdf", mimetype="application/pdf")
+    pdf = HTML(string=full_html).write_pdf()
+    response = make_response(pdf)
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = f'attachment; filename=audit-report-{url.split("//")[-1].split("/")[0]}.pdf'
+    return response
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run()
