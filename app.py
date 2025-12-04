@@ -6,13 +6,11 @@ import time
 from bs4 import BeautifulSoup
 from io import BytesIO
 from weasyprint import HTML
-import asyncio
-import pyppeteer  # For screenshots
-import base64  # To embed screenshot in PDF
+import os  # For env checks
 
 app = Flask(__name__)
 
-# Beautiful HTML + CSS (kept exactly like your current design)
+# Your existing HTML_TEMPLATE (unchanged)
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
@@ -77,7 +75,7 @@ HTML_TEMPLATE = """
 def home():
     return HTML_TEMPLATE
 
-# New: Get grade from score
+# Get grade from score
 def get_grade(score):
     if score >= 90: return "A (Excellent)"
     elif score >= 80: return "B (Good)"
@@ -85,7 +83,7 @@ def get_grade(score):
     elif score >= 60: return "D (Poor)"
     else: return "F (Critical Issues)"
 
-# New: Recommendations dictionary
+# Recommendations dictionary (unchanged)
 RECOMMENDATIONS = {
     "SSL/HTTPS": "Install a free SSL certificate from Let's Encrypt or Cloudflare to enable HTTPS.",
     "Load Time": "Optimize images, minify CSS/JS, and use a CDN to reduce load time below 3 seconds.",
@@ -126,16 +124,24 @@ def api_check():
        
         soup = BeautifulSoup(r.text, 'html.parser')
        
-        # Additional attributes per international standards (WCAG, Core Web Vitals, OWASP, Google SEO)
         title = soup.title.string if soup.title else "No Title"
         title_length = len(title) if title else 0
         meta_desc = soup.find("meta", attrs={"name": "description"})
         meta_desc_length = len(meta_desc["content"]) if meta_desc else 0
         has_viewport = bool(soup.find("meta", attrs={"name": "viewport"}))
-        has_alt_images = all(img.get("alt") for img in soup.find_all("img"))
+        has_alt_images = all(img.get("alt") for img in soup.find_all("img")) if soup.find_all("img") else True
         heading_count = len(soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6']))
         has_h1 = bool(soup.find("h1"))
-        broken_links = [a['href'] for a in soup.find_all("a", href=True) if a['href'].startswith("http") and requests.head(a['href'], timeout=5).status_code >= 400]
+        # Limit broken links check to avoid timeout (check only first 5)
+        broken_links = []
+        links = soup.find_all("a", href=True)[:5]
+        for a in links:
+            if a['href'].startswith("http"):
+                try:
+                    if requests.head(a['href'], timeout=3).status_code >= 400:
+                        broken_links.append(a['href'])
+                except:
+                    pass
         num_broken_links = len(broken_links)
         has_gzip = r.headers.get("Content-Encoding", "").lower() == "gzip"
         security_headers = {
@@ -143,7 +149,7 @@ def api_check():
             "CSP": "Content-Security-Policy" in r.headers,
             "X-Frame-Options": "X-Frame-Options" in r.headers
         }
-        accessibility_basics = has_alt_images and has_h1 and heading_count > 0 # Basic WCAG check
+        accessibility_basics = has_alt_images and has_h1 and heading_count > 0
         mobile_friendly = has_viewport
         seo_score = (1 if 30 < title_length < 60 else 0) + (1 if 120 < meta_desc_length < 160 else 0) + (1 if has_h1 else 0)
        
@@ -159,7 +165,7 @@ def api_check():
 
         grade = get_grade(score)
        
-        # Build table rows with recommendations
+        # Build rows with real data (no placeholders)
         rows = [
             {"metric": "Final URL", "value": final_url, "status": "OK", "rec": ""},
             {"metric": "HTTP Status", "value": r.status_code, "status": "Good" if r.status_code == 200 else "Check", "rec": "" if r.status_code == 200 else "Investigate server errors."},
@@ -181,10 +187,10 @@ def api_check():
             {"metric": "Overall Quality Score", "value": f"<strong>{score}/100</strong>", "status": "Excellent" if score >= 80 else "Needs Improvement", "rec": ""},
         ]
 
-        # Build HTML table (now with 4 columns)
+        # Build HTML table
         table_html = "<table><tr><th>Metric</th><th>Value</th><th>Status</th><th>Recommendation</th></tr>"
         for row in rows:
-            status_class = "good" if "good" in row["status"].lower() or "excellent" in row["status"].lower() or "secure" in row["status"].lower() or "fast" in row["status"].lower() or "light" in row["status"].lower() or "optimal" in row["status"].lower() or "compliant" in row["status"].lower() or "enabled" in row["status"].lower() or "none" in row["status"].lower() else "bad"
+            status_class = "good" if any(good in row["status"].lower() for good in ["good", "excellent", "secure", "fast", "light", "optimal", "compliant", "enabled", "none", "ok"]) else "bad"
             table_html += f"<tr><td>{row['metric']}</td><td>{row['value']}</td><td class='{status_class}'>{row['status']}</td><td>{row['rec']}</td></tr>"
         table_html += "</table>"
 
@@ -192,102 +198,93 @@ def api_check():
         <h2>Results for <code>{final_url}</code></h2>
         <p>Overall Grade: <strong>{grade}</strong></p>
         {table_html}
-        <p><a href="/">← Check Another Website</a> | <a href="/api/pdf?url={request.args.get('url')}">Download PDF Report</a> | <a href="/api/pdf?url={request.args.get('url')}&white_label=true">White-Label PDF</a></p>
+        <p><a href="/">← Check Another Website</a> | <a href="/api/pdf?url={url}">Download PDF Report</a> | <a href="/api/pdf?url={url}&white_label=true">White-Label PDF</a></p>
         """
-        return jsonify({"html": html, "data": {  # Return data for PDF reuse
+        return jsonify({"html": html, "data": {
             "url": url,
             "final_url": final_url,
             "score": score,
             "grade": grade,
-            "rows": rows
+            "rows": rows,
+            "table_html": table_html  # Pass full table for PDF
         }})
    
     except Exception as e:
         return jsonify({"html": f"<p class='bad'>Error: {str(e)}</p><a href='/'>← Back</a>"})
-
-# New: Async screenshot function
-async def take_screenshot(url):
-    browser = await pyppeteer.launch(headless=True, args=['--no-sandbox'])
-    page = await browser.newPage()
-    await page.setViewport({'width': 1280, 'height': 800})
-    await page.goto(url, {'waitUntil': 'networkidle2'})
-    screenshot = await page.screenshot({'encoding': 'base64'})
-    await browser.close()
-    return screenshot
 
 @app.route("/api/pdf")
 def generate_pdf():
     url = request.args.get("url")
     white_label = request.args.get("white_label", "false").lower() == "true"
     if not url:
-        return "No URL", 400
+        return "No URL provided", 400
 
-    # Reuse check logic
-    result = api_check()
-    if "error" in result.get_json():
-        return "Error generating report", 500
+    try:
+        # Call api_check to get real data
+        check_result = api_check()
+        if check_result.status_code != 200:
+            return "Error fetching audit data", 500
+        data = check_result.get_json()["data"]
 
-    data = result.get_json()["data"]
-    table_html = "<table><tr><th>Metric</th><th>Value</th><th>Status</th><th>Recommendation</th></tr>"
-    for row in data["rows"]:
-        status_class = "good" if "good" in row["status"].lower() or "excellent" in row["status"].lower() or "secure" in row["status"].lower() or "fast" in row["status"].lower() or "light" in row["status"].lower() or "optimal" in row["status"].lower() or "compliant" in row["status"].lower() or "enabled" in row["status"].lower() or "none" in row["status"].lower() else "bad"
-        table_html += f"<tr><td>{row['metric']}</td><td>{row['value']}</td><td class='{status_class}'>{row['status']}</td><td>{row['rec']}</td></tr>"
-    table_html += "</table>"
+        # Use passed table_html (real data)
+        table_html = data["table_html"]
 
-    # Get screenshot (run async)
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    screenshot_base64 = loop.run_until_complete(take_screenshot(data["final_url"]))
+        # Build full PDF HTML (professional format)
+        branding = "" if white_label else "<p style='text-align: center; font-size: 12px; color: #666;'>Powered by Website Quality Checker</p>"
+        full_html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                body {{ font-family: 'Segoe UI', sans-serif; margin: 40px; page-break-before: avoid; }}
+                h1 {{ color: #4a00e0; text-align: center; page-break-after: avoid; }}
+                h2 {{ color: #333; }}
+                table {{ width: 100%; border-collapse: collapse; margin-top: 20px; page-break-inside: avoid; }}
+                th, td {{ padding: 12px; border: 1px solid #ddd; text-align: left; }}
+                th {{ background: #f0f0f0; font-weight: bold; }}
+                .good {{ color: green; font-weight: bold; }}
+                .bad {{ color: red; font-weight: bold; }}
+                .header {{ background: #4a00e0; color: white; padding: 30px; text-align: center; margin-bottom: 20px; page-break-after: avoid; }}
+                .summary {{ margin: 20px 0; font-size: 1.2em; text-align: center; background: #f8f9fa; padding: 20px; border-radius: 8px; }}
+                .grade {{ font-size: 3em; color: #4a00e0; }}
+                @page {{ size: A4; margin: 20mm; }}
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1>Website Quality Audit Report</h1>
+                <h2>{data['url']}</h2>
+                <p>Generated on {time.strftime('%B %d, %Y %H:%M')}</p>
+            </div>
+            <div class="summary">
+                <p><strong>Overall Score: {data['score']}/100</strong></p>
+                <p class="grade">{data['grade']}</p>
+                <p>Your site scores {data['score']}/100. Focus on recommendations for quick wins.</p>
+            </div>
+            <h2>Detailed Metrics & Recommendations</h2>
+            {table_html}
+            <div style="margin-top: 40px; page-break-before: avoid;">
+                <h3>Next Steps</h3>
+                <p>Prioritize fixes marked in red. Retest after changes for improved score.</p>
+                {branding}
+            </div>
+        </body>
+        </html>
+        """
 
-    # Build full PDF HTML
-    branding = "" if white_label else "<p>Powered by Website Quality Checker - Your Logo Here</p>"
-    full_html = f"""
-    <html>
-    <head>
-        <style>
-            body {{ font-family: 'Segoe UI', sans-serif; margin: 40px; page-break-before: avoid; }}
-            h1 {{ color: #4a00e0; text-align: center; }}
-            h2 {{ color: #333; }}
-            table {{ width: 100%; border-collapse: collapse; margin-top: 20px; }}
-            th, td {{ padding: 12px; border: 1px solid #ddd; text-align: left; }}
-            th {{ background: #f0f0f0; }}
-            .good {{ color: green; font-weight: bold; }}
-            .bad {{ color: red; font-weight: bold; }}
-            .header {{ background: #4a00e0; color: white; padding: 20px; text-align: center; }}
-            .summary {{ margin: 20px 0; font-size: 1.2em; text-align: center; }}
-            .screenshot {{ width: 100%; margin: 20px 0; page-break-inside: avoid; }}
-            .screenshot img {{ max-width: 100%; border: 1px solid #ddd; }}
-            .recommendations {{ margin-top: 30px; }}
-            @page {{ size: A4; margin: 20mm; }}
-        </style>
-    </head>
-    <body>
-        <div class="header">
-            <h1>Website Quality Audit Report</h1>
-            <h2>{url}</h2>
-            <p>Generated on {time.strftime('%B %d, %Y')}</p>
-        </div>
-        <div class="summary">
-            <p>Overall Score: {data['score']}/100</p>
-            <p>Grade: {data['grade']}</p>
-            <p>Summary: Your site scores {data['score']}/100. Focus on high-impact fixes below.</p>
-        </div>
-        <h2>Detailed Metrics</h2>
-        {table_html}
-        <div class="screenshot">
-            <h2>Desktop Screenshot</h2>
-            <img src="data:image/png;base64,{screenshot_base64}" alt="Website Screenshot">
-        </div>
-        {branding}
-    </body>
-    </html>
-    """
+        # Generate PDF with error handling
+        pdf = HTML(string=full_html).write_pdf()
+        response = make_response(pdf)
+        response.headers['Content-Type'] = 'application/pdf'
+        filename = f"audit-report-{url.split('//')[-1].split('/')[0]}.pdf"
+        response.headers['Content-Disposition'] = f'attachment; filename={filename}'
+        return response
 
-    pdf = HTML(string=full_html).write_pdf()
-    response = make_response(pdf)
-    response.headers['Content-Type'] = 'application/pdf'
-    response.headers['Content-Disposition'] = f'attachment; filename=audit-report-{url.split("//")[-1].split("/")[0]}.pdf'
-    return response
+    except ImportError as e:
+        # Fallback if WeasyPrint fails
+        return jsonify({"error": f"WeasyPrint not available: {str(e)}. Use basic report."}), 500
+    except Exception as e:
+        return f"PDF generation error: {str(e)}", 500
 
 if __name__ == "__main__":
-    app.run()
+    app.run(debug=True)
