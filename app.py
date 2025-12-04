@@ -7,16 +7,8 @@ from bs4 import BeautifulSoup
 from io import BytesIO
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
-from reportlab.lib.utils import simpleProducer
-import os
-
-# Lazy import for WeasyPrint (only when needed)
-weasyprint_available = False
-try:
-    from weasyprint import HTML
-    weasyprint_available = True
-except ImportError:
-    pass  # Fallback to ReportLab
+from reportlab.lib.units import inch
+import traceback  # For error logging
 
 app = Flask(__name__)
 
@@ -43,7 +35,6 @@ HTML_TEMPLATE = """
         th { background:#f0f0f0;}
         .good { color:green; font-weight:bold;}
         .bad { color:red; font-weight:bold;}
-        footer { text-align:center; padding:20px; background:#333; color:white;}
     </style>
 </head>
 <body>
@@ -119,8 +110,8 @@ def api_check():
     if not url.startswith("http"):
         url = "https://" + url
    
-    start_time = time.time()
     try:
+        start_time = time.time()
         headers = {"User-Agent": "Website-Quality-Checker/1.0"}
         r = requests.get(url, timeout=15, allow_redirects=True, headers=headers)
         load_time = round(time.time() - start_time, 2)
@@ -140,16 +131,16 @@ def api_check():
         has_alt_images = all(img.get("alt") for img in soup.find_all("img")) if soup.find_all("img") else True
         heading_count = len(soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6']))
         has_h1 = bool(soup.find("h1"))
-        broken_links = []
-        links = soup.find_all("a", href=True)[:5]  # Limit to avoid timeout
+        # Limit to 3 links to avoid timeout/crash
+        num_broken_links = 0
+        links = soup.find_all("a", href=True)[:3]
         for a in links:
             if a['href'].startswith("http"):
                 try:
                     if requests.head(a['href'], timeout=3).status_code >= 400:
-                        broken_links.append(a['href'])
+                        num_broken_links += 1
                 except:
                     pass
-        num_broken_links = len(broken_links)
         has_gzip = r.headers.get("Content-Encoding", "").lower() == "gzip"
         security_headers = {
             "HSTS": "Strict-Transport-Security" in r.headers,
@@ -193,7 +184,7 @@ def api_check():
             {"metric": "Overall Quality Score", "value": f"{score}/100", "status": "Excellent" if score >= 80 else "Needs Improvement", "rec": ""},
         ]
 
-        # Build HTML table for web display
+        # Web table
         table_html = "<table><tr><th>Metric</th><th>Value</th><th>Status</th><th>Recommendation</th></tr>"
         for row in rows:
             status_class = "good" if any(good in row["status"].lower() for good in ["good", "excellent", "secure", "fast", "light", "optimal", "compliant", "enabled", "none", "ok"]) else "bad"
@@ -206,16 +197,12 @@ def api_check():
         {table_html}
         <p><a href="/">← Check Another Website</a> | <a href="/api/pdf?url={url}">Download PDF Report</a> | <a href="/api/pdf?url={url}&white_label=true">White-Label PDF</a></p>
         """
-        return jsonify({"html": html, "data": {
-            "url": url,
-            "final_url": final_url,
-            "score": score,
-            "grade": grade,
-            "rows": rows
-        }})
+        return jsonify({"html": html, "data": {"url": url, "final_url": final_url, "score": score, "grade": grade, "rows": rows}})
    
     except Exception as e:
-        return jsonify({"html": f"<p class='bad'>Error: {str(e)}</p><a href='/'>← Back</a>"})
+        error_msg = f"Error in check: {str(e)}\n{traceback.format_exc()}"
+        print(error_msg)  # Logs to Vercel
+        return jsonify({"html": f"<p class='bad'>Error: {str(e)}</p><a href='/'>← Back</a>"}), 500
 
 @app.route("/api/pdf")
 def generate_pdf():
@@ -225,126 +212,77 @@ def generate_pdf():
         return "No URL provided", 400
 
     try:
-        # Always get real data first
+        # Get real data
         check_result = api_check()
         if check_result.status_code != 200:
             return "Error fetching audit data", 500
         data = check_result.get_json()["data"]
 
-        # Build table string from real rows (no placeholders!)
-        table_text = "Metric | Value | Status | Recommendation\n"
-        table_text += "-" * 80 + "\n"
+        # Build table text from real rows
+        table_lines = ["Metric | Value | Status | Recommendation"]
+        table_lines.append("-" * 80)
         for row in data["rows"]:
-            table_text += f"{row['metric']} | {row['value']} | {row['status']} | {row['rec']}\n"
+            table_lines.append(f"{row['metric']} | {row['value']} | {row['status']} | {row['rec'][:50]}...")  # Truncate recs for space
 
         branding = "" if white_label else "Powered by Website Quality Checker"
 
-        if weasyprint_available:
-            # Try WeasyPrint for beautiful PDF
-            try:
-                full_html = f"""
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <style>
-                        body {{ font-family: 'Segoe UI', sans-serif; margin: 40px; }}
-                        h1 {{ color: #4a00e0; text-align: center; }}
-                        h2 {{ color: #333; }}
-                        table {{ width: 100%; border-collapse: collapse; margin-top: 20px; }}
-                        th, td {{ padding: 12px; border: 1px solid #ddd; text-align: left; }}
-                        th {{ background: #f0f0f0; }}
-                        .good {{ color: green; font-weight: bold; }}
-                        .bad {{ color: red; font-weight: bold; }}
-                        .header {{ background: #4a00e0; color: white; padding: 20px; text-align: center; }}
-                        .summary {{ margin: 20px 0; font-size: 1.2em; text-align: center; }}
-                        @page {{ size: A4; margin: 20mm; }}
-                    </style>
-                </head>
-                <body>
-                    <div class="header">
-                        <h1>Website Quality Audit Report</h1>
-                        <h2>{data['url']}</h2>
-                        <p>Generated on {time.strftime('%B %d, %Y %H:%M')}</p>
-                    </div>
-                    <div class="summary">
-                        <p><strong>Overall Score: {data['score']}/100</strong></p>
-                        <p><strong>Grade: {data['grade']}</strong></p>
-                        <p>Summary: Your site scores {data['score']}/100. Focus on recommendations below.</p>
-                    </div>
-                    <h2>Detailed Metrics</h2>
-                    <table>
-                        <tr><th>Metric</th><th>Value</th><th>Status</th><th>Recommendation</th></tr>
-                        """ + "".join([f"<tr><td>{row['metric']}</td><td>{row['value']}</td><td class='good'>{row['status']}</td><td>{row['rec']}</td></tr>" for row in data["rows"]]) + """
-                    </table>
-                    <p style='text-align: center; font-size: 12px; color: #666;'>{branding}</p>
-                </body>
-                </html>
-                """
-                pdf = HTML(string=full_html).write_pdf()
-                response = make_response(pdf)
-                response.headers['Content-Type'] = 'application/pdf'
-                filename = f"audit-report-{url.split('//')[-1].split('/')[0]}.pdf"
-                response.headers['Content-Disposition'] = f'attachment; filename={filename}'
-                return response
-            except Exception as wp_error:
-                # Fallback if WeasyPrint still fails
-                print(f"WeasyPrint fallback due to: {wp_error}")  # Log for debugging
-                pass
-
-        # Fallback: ReportLab with real data (text-based but complete)
+        # ReportLab PDF with real data (professional layout)
         buffer = BytesIO()
         c = canvas.Canvas(buffer, pagesize=letter)
         width, height = letter
-        y = height - 50
+        y = height - 1 * inch
 
-        # Title
-        c.setFont("Helvetica-Bold", 16)
-        c.drawString(50, y, "Website Quality Audit Report")
-        y -= 30
+        # Header
+        c.setFont("Helvetica-Bold", 18)
+        c.drawCentredText(width / 2, y, "Website Quality Audit Report")
+        y -= 0.5 * inch
         c.setFont("Helvetica", 12)
-        c.drawString(50, y, f"URL: {data['url']}")
-        y -= 20
-        c.drawString(50, y, f"Generated: {time.strftime('%B %d, %Y %H:%M')}")
-        y -= 30
+        c.drawCentredText(width / 2, y, data["url"])
+        y -= 0.3 * inch
+        c.drawCentredText(width / 2, y, f"Generated: {time.strftime('%B %d, %Y %H:%M')}")
+        y -= 0.5 * inch
 
         # Summary
         c.setFont("Helvetica-Bold", 14)
-        c.drawString(50, y, "Executive Summary")
-        y -= 20
-        c.setFont("Helvetica", 12)
-        c.drawString(50, y, f"Overall Score: {data['score']}/100")
-        y -= 15
-        c.drawString(50, y, f"Grade: {data['grade']}")
-        y -= 20
-        c.drawString(50, y, "Your site scores {data['score']}/100. Focus on high-impact fixes.")
-        y -= 30
+        c.drawString(0.5 * inch, y, "Executive Summary")
+        y -= 0.3 * inch
+        c.setFont("Helvetica-Bold", 16)
+        c.drawString(0.5 * inch, y, f"Score: {data['score']}/100 | Grade: {data['grade']}")
+        y -= 0.5 * inch
+        c.setFont("Helvetica", 11)
+        c.drawString(0.5 * inch, y, f"Summary: Your site scores {data['score']}/100. Focus on red-highlighted recommendations for quick improvements.")
+        y -= 0.5 * inch
 
-        # Table (simple text)
+        # Metrics Table
         c.setFont("Helvetica-Bold", 12)
-        c.drawString(50, y, "Metric | Value | Status | Recommendation")
-        y -= 15
+        c.drawString(0.5 * inch, y, table_lines[0])
+        y -= 0.2 * inch
         c.setFont("Helvetica", 10)
-        for line in table_text.split("\n")[1:]:  # Skip header
-            if y < 50:  # New page if needed
+        for line in table_lines[1:]:
+            if y < 1 * inch:  # New page
                 c.showPage()
-                y = height - 50
-            c.drawString(50, y, line[:80])  # Wrap long lines
-            y -= 12
+                y = height - 1 * inch
+            c.drawString(0.5 * inch, y, line)
+            y -= 0.2 * inch
 
-        # Branding
-        y -= 20
+        # Footer
+        y -= 0.3 * inch
         c.setFont("Helvetica", 10)
-        c.drawString(50, y, branding)
+        c.drawCentredText(width / 2, y, "Next Steps: Prioritize fixes in red. Retest for better score.")
+        y -= 0.3 * inch
+        c.drawCentredText(width / 2, y, branding)
 
         c.save()
         buffer.seek(0)
         response = make_response(buffer.getvalue())
         response.headers['Content-Type'] = 'application/pdf'
-        filename = f"audit-report-{url.split('//')[-1].split('/')[0]}.pdf"
+        filename = f"quality-report-{url.split('//')[-1].split('/')[0]}.pdf"
         response.headers['Content-Disposition'] = f'attachment; filename={filename}'
         return response
 
     except Exception as e:
+        error_msg = f"PDF Error: {str(e)}\n{traceback.format_exc()}"
+        print(error_msg)  # Logs to Vercel
         return f"PDF generation error: {str(e)}", 500
 
 if __name__ == "__main__":
