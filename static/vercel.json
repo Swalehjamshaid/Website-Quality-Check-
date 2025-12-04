@@ -5,8 +5,7 @@
       "src": "wsgi.py",
       "use": "@vercel/python",
       "config": {
-        "maxLambdaSize": "50mb",
-        "includeFiles": ["templates/**", "static/**"]
+        "maxLambdaSize": "50mb"
       }
     }
   ],
