@@ -1,13 +1,12 @@
 # wsgi.py
 from app import app
 
-# This single line is enough for Vercel + Gunicorn + Flask
+# This makes it work on Vercel
 application = app
 
-# Optional: Force Vercel to install all dependencies (important for WeasyPrint!)
+# Force install WeasyPrint dependencies (important for future PDF)
 try:
     import weasyprint
     import cairo
-    import gi
 except ImportError:
     pass
