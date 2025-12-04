@@ -1,7 +1,13 @@
 # wsgi.py
+from app import app
 
-from app import create_app
-import os
+# This single line is enough for Vercel + Gunicorn + Flask
+application = app
 
-# Call the factory function to create the application instance
-application = create_app(config_name=os.environ.get('FLASK_CONFIG', 'default'))
+# Optional: Force Vercel to install all dependencies (important for WeasyPrint!)
+try:
+    import weasyprint
+    import cairo
+    import gi
+except ImportError:
+    pass
