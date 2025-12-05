@@ -13,7 +13,16 @@ services:
       # INTEGRATED SECRET KEY: Render automatically generates a unique, secure key here
       - key: SECRET_KEY
         generateValue: true
-      # Include CELERY_RESULT_BACKEND for tracking task status
+      
+      # === SUPABASE CREDENTIALS (Anon key needed for client interaction) ===
+      - key: SUPABASE_URL
+        value: "https://uytkmnbeafbplccmbaaq.supabase.co"
+      - key: SUPABASE_ANON_KEY
+        value: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5dGttbmJlYWZicGxjY21iYWJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQxNjk5OTAsImV4cCI6MjA3OTc0NTk5MH0.eff-1L5VSVPNjzsLxeSeUK7vXxa4udKi3KDN4DsPzBY"
+      - key: SUPABASE_SERVICE_ROLE_KEY # Needed for server-side operations
+        value: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5dGttbmJlYWZicGxjY21iYWJxIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NDE2OTk5MCwiZXhwIjoyMDc5NzQ1OTkwfQ.kipPHFN1Q0KoyUcGm7LSuFW058k-odqfC0MgcNtlvyk"
+
+      # Celery broker configuration
       - key: CELERY_BROKER_URL
         fromService:
           type: keyvalue
@@ -35,6 +44,13 @@ services:
     # CRITICAL CORRECTION: Targets the app.celery_app object based on your celery_worker.py file
     startCommand: "celery -A app.celery_app worker --loglevel info"
     envVars:
+      # === SUPABASE CREDENTIALS (Worker needs the Service Role key for database writes) ===
+      - key: SUPABASE_URL
+        value: "https://uytkmnbeafbplccmbaaq.supabase.co"
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        value: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5dGttbmJlYWZicGxjY21iYWJxIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NDE2OTk5MCwiZXhwIjoyMDc5NzQ1OTkwfQ.kipPHFN1Q0KoyUcGm7LSuFW058k-odqfC0MgcNtlvyk"
+      
+      # Celery broker configuration
       - key: CELERY_BROKER_URL
         fromService:
           type: keyvalue
@@ -47,7 +63,6 @@ services:
         value: "1"
 
   # 3. CELERY BEAT SERVICE (Runs the scheduler/crontab from celery_worker.py)
-  # This dedicated service is necessary to reliably run scheduled tasks (like daily audits)
   - type: worker
     name: website-celery-beat
     env: python
@@ -57,6 +72,13 @@ services:
     # Targets the app.celery_app object to run the scheduler
     startCommand: "celery -A app.celery_app beat --loglevel info"
     envVars:
+      # === SUPABASE CREDENTIALS (Beat needs the Service Role key for database writes) ===
+      - key: SUPABASE_URL
+        value: "https://uytkmnbeafbplccmbaaq.supabase.co"
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        value: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5dGttbmJlYWZicGxjY21iYWJxIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NDE2OTk5MCwiZXhwIjoyMDc5NzQ1OTkwfQ.kipPHFN1Q0KoyUcGm7LSuFW058k-odqfC0MgcNtlvyk"
+      
+      # Celery broker configuration
       - key: CELERY_BROKER_URL
         fromService:
           type: keyvalue
@@ -65,12 +87,10 @@ services:
         fromService:
           type: keyvalue
           name: celery-broker
-      - key: PYTHONUNBUFFERED
-        value: "1"
 
 # 4. DATA STORE (Redis/Key Value for Celery Broker)
 keyvalues:
   - name: celery-broker
-    plan: starter # Changed to 'starter' for data persistence (Free tier does not persist data)
+    plan: starter # Provides data persistence, recommended for queues
     region: us-east
     maxmemoryPolicy: noeviction
