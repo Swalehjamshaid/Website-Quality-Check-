@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Monthly Report - {{ user.name }}</title>
+    <style>
+        body { font-family: DejaVu Sans; margin: 40px; line-height: 1.6; }
+        .header { background: #4f46e5; color: white; padding: 30px; text-align: center; border-radius: 10px; }
+        .site { page-break-inside: avoid; margin: 40px 0; border: 2px solid #eee; padding: 20px; border-radius: 10px; }
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        th { background: #4f46e5; color: white; }
+        th, td { border: 1px solid #ccc; padding: 8px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>{{ freq.title() }} Website Performance Report</h1>
+        <h2>For {{ user.name }} ({{ user.email }})</h2>
+        <p>{{ now.strftime('%B %Y') }}</p>
+    </div>
+
+    {% for website in websites %}
+    <div class="site">
+        <h2>{{ loop.index }}. {{ website.name or website.url }}</h2>
+        <p><strong>URL:</strong> {{ website.url }}</p>
+
+        {% set audits = website.audits|list %}
+        {% if audits %}
+        {% set latest = audits[-1] %}
+        <p><strong>Latest Load Time:</strong> {{ latest.load_time }}s | 
+           <strong>SEO Score:</strong> {{ latest.seo_score }}/100</p>
+
+        <table>
+            <tr><th>Date</th><th>Load Time</th><th>SEO</th><th>Size KB</th></tr>
+            {% for a in audits[-10:]|reverse %}
+            <tr>
+                <td>{{ a.timestamp.strftime('%m-%d') }}</td>
+                <td>{{ a.load_time }}s</td>
+                <td>{{ a.seo_score }}</td>
+                <td>{{ a.page_size_kb }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+        {% else %}
+        <p>No audit data yet.</p>
+        {% endif %}
+    </div>
+    {% endfor %}
+
+    <div style="text-align:center; margin-top:60px; color:#666;">
+        Powered by 37Metrics Auditor — Automated Daily Monitoring System
+    </div>
+</body>
+</html>
