@@ -90,7 +90,7 @@ services:
           name: celery-broker
 
 # 4. DATA STORE (Redis/Key Value for Celery Broker)
-keyvalues:
+keyValue:
   - name: celery-broker
     plan: starter # Provides data persistence, recommended for queues
     region: us-east
