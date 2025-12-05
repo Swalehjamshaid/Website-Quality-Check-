@@ -1,5 +1,5 @@
 services:
-  - type: worker
+  - type: worker 
     name: celery-scheduler
     region: us-east
     plan: starter
