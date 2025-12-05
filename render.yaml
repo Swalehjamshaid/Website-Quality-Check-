@@ -1,5 +1,5 @@
-services: # <--- CRITICAL: This must be present and at ZERO indentation
-  - type: worker 
+services: # <--- CRITICAL: This top-level key must be present!
+  - type: worker # This is the type of the service
     name: celery-scheduler
     region: us-east
     plan: starter
@@ -21,7 +21,7 @@ services: # <--- CRITICAL: This must be present and at ZERO indentation
           type: keyValue
           name: celery-broker
 
-resources: # <--- This must align exactly with 'services:'
+resources: # <--- This must be at ZERO indentation, aligning with 'services:'
   - name: celery-broker
     type: keyvalue
     plan: starter 
