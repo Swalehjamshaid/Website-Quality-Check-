@@ -1,5 +1,5 @@
-services: # <--- CRITICAL: This must be present and at ZERO indentation
-  - type: worker # Fixes 'expected "type" in object' error
+services: # <--- CRITICAL: Must be at ZERO indentation (Column 1)
+  - type: worker 
     name: celery-scheduler
     region: us-east
     plan: starter
@@ -21,7 +21,7 @@ services: # <--- CRITICAL: This must be present and at ZERO indentation
           type: keyValue
           name: celery-broker
 
-resources: # <--- This must align exactly with 'services:' at ZERO indentation
+resources: # <--- Must align exactly with 'services:' at ZERO indentation (Column 1)
   - name: celery-broker
     type: keyvalue
     plan: starter 
