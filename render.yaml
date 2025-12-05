@@ -1,17 +1,15 @@
 services:
   - type: web
-    name: your-app-name-here 
-    # ... other config ...
+    name: your-app-name-here # Replace with your app name
+    # ... other configuration (e.g., buildCommand, startCommand) ...
+    
     envVars:
-      # ...
+      # ... (your other env vars)
       - key: CELERY_RESULT_BACKEND
         fromService:
           type: keyValue
-          name: celery-broker
-# The single service item ends here.
-# -------------------------------------------------------------
-
-resources: # <--- Must align with 'services:' and 'services:' above it
+          name: celery-broker # <--- This is the last line of the services list item
+resources: # <--- MUST be at Column 1, IMMEDIATELY after the last line of the item
   - name: celery-broker
     type: keyValue
     plan: starter
