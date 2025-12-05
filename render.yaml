@@ -1,4 +1,5 @@
 services:
+  # Web Service (Node.js Application)
   - type: web
     name: rest-express
     env: node
@@ -8,3 +9,21 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+
+  # Worker Service (from your snippet)
+  # Note: This configuration requires a Python environment which is not present in this Node.js project.
+  # The build will fail unless you have a requirements.txt and Python code.
+  - type: worker
+    name: celery-scheduler
+    region: us-east
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: celery -A app.celery_app beat --loglevel info
+
+resources:
+  # Redis Resource (Corrected type from 'keyvalue' to 'redis')
+  - name: celery-broker
+    type: redis
+    plan: starter
+    region: us-east
+    maxmemoryPolicy: noeviction
