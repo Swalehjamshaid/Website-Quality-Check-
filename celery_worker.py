@@ -1,23 +1,70 @@
-# celery_worker.py - Defines the schedule for Daily Audits and Reports
+# Blueprint version for deploying your multi-service architecture
+services:
+  # 1. WEB SERVICE (Handles HTTP requests via Gunicorn)
+  - type: web
+    name: website-quality-check-web
+    env: python
+    region: us-east
+    plan: starter # Starter plan recommended for a full production stack
+    buildCommand: "pip install -r requirements.txt"
+    # IMPORTANT: Use the command from your Procfile which points to wsgi.py
+    startCommand: "gunicorn wsgi:application" 
+    envVars:
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: keyvalue
+          name: celery-broker
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          type: keyvalue
+          name: celery-broker
+      - key: PYTHONUNBUFFERED
+        value: "1" 
+      # Add your necessary secrets here
+      - key: SECRET_KEY
+        generateValue: true
 
-# CRITICAL: This file must be in your repository root, 
-# and it is used by the 'report-beat' service defined in render.yaml
+  # 2. CELERY WORKER SERVICE (Executes the actual tasks)
+  - type: worker
+    name: website-celery-worker
+    env: python
+    region: us-east
+    plan: starter # Starter plan recommended for a worker
+    buildCommand: "pip install -r requirements.txt"
+    # CRITICAL: Starts the worker process, targeting the celery_app object in the app module
+    startCommand: "celery -A app.celery_app worker --loglevel info"
+    envVars:
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: keyvalue
+          name: celery-broker
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          type: keyvalue
+          name: celery-broker
 
-from app import celery_app
-from celery.schedules import crontab
+  # 3. CELERY BEAT SERVICE (Runs the scheduler/crontab)
+  - type: worker
+    name: website-celery-beat
+    env: python
+    region: us-east
+    plan: starter
+    buildCommand: "pip install -r requirements.txt"
+    # CRITICAL: Starts the beat process, using the beat schedule defined in celery_worker.py
+    startCommand: "celery -A app.celery_app beat -S celery_worker.CeleryBeatScheduler --loglevel info"
+    envVars:
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: keyvalue
+          name: celery-broker
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          type: keyvalue
+          name: celery-broker
 
-# Define when Celery Beat should run the tasks
-celery_app.conf.beat_schedule = {
-    # Task 1: Daily Monitoring (Triggers the function that queues all individual audits)
-    # This task calls app.daily_audit_all, which then uses app.audit_website.delay()
-    'run-daily-system-audits': {
-        'task': 'app.daily_audit_all',
-        'schedule': crontab(hour=2, minute=0), # Daily at 02:00 AM UTC
-    },
-    # Task 2: Scheduled Report Sending (Checks user schedules every 5 minutes)
-    # This task calls app.send_scheduled_reports, which contains the scheduling logic.
-    'check-user-report-schedules': {
-        'task': 'app.send_scheduled_reports',
-        'schedule': crontab(minute='*/5'), 
-    },
-}
+# 4. DATA STORE (Redis/Key Value for Celery Broker)
+keyvalues:
+  - name: celery-broker
+    plan: starter # Starter plan provides persistence, recommended for queues
+    region: us-east
+    maxmemoryPolicy: noeviction
