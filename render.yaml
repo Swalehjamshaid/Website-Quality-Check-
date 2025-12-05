@@ -1,9 +1,19 @@
-# ... (Lines 1-6 are the preceding context)
-# 6.   name: celery-broker
+services:
+  # Your web service
+  - type: web
+    name: website-quality-check
+    env: node
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          type: redis
+          name: celery-broker
 
-# Add a blank line here for clear separation
-resources: # <--- Keep this at Column 1
-# 9.   # 3. KEY-VALUE STORE (Redis for Celery Broker)
-# 10.  - name: celery-broker
-# 11.    type: keyValue
-# ...
+  # FIX: Move the broker here and define it as a Redis service
+  - type: redis
+    name: celery-broker
+    plan: free
+    ipAllowList: [] # optional: allows access from anywhere if empty, or strict list
