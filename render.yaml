@@ -1,19 +1,32 @@
-services:
-  - type: worker
+# Blueprint file must start with a key that defines a list (like 'services:' or 'resources:').
+# The error is solved by ensuring the services: key is present.
+
+services: # <--- THIS MUST BE THE FIRST STRUCTURAL KEY AT ZERO INDENTATION!
+  - type: worker 
     name: celery-scheduler
     region: us-east
     plan: starter
     buildCommand: pip install -r requirements.txt
-    startCommand: celery -A app.celery_app beat --loglevel info
+    startCommand: celery -A app.celery_app beat --loglevel info 
+    
     envVars:
-      SUPABASE_URL: "<YOUR_SUPABASE_URL>"
-      SUPABASE_SERVICE_ROLE_KEY: "<YOUR_SERVICE_ROLE_KEY>"
-      CELERY_BROKER_URL: "<YOUR_BROKER_URL>"
-      CELERY_RESULT_BACKEND: "<YOUR_RESULT_BACKEND_URL>"
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+        
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: keyValue
+          name: celery-broker
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          type: keyValue
+          name: celery-broker
 
-resources:
+resources: # <--- This must align EXACTLY with 'services:' at the far left margin.
   - name: celery-broker
     type: keyvalue
-    plan: starter
+    plan: starter 
     region: us-east
     maxmemoryPolicy: noeviction
