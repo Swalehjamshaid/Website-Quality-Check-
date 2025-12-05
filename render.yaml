@@ -1,4 +1,4 @@
-services: # <--- THIS TOP-LEVEL KEY IS REQUIRED!
+services: # <--- THIS IS THE MISSING/STRUCTURALLY INCORRECT KEY!
   - type: worker 
     name: celery-scheduler
     region: us-east
@@ -21,7 +21,7 @@ services: # <--- THIS TOP-LEVEL KEY IS REQUIRED!
           type: keyValue
           name: celery-broker
 
-resources: # <--- Must align with 'services:' at the far left margin
+resources: # <--- This must align exactly with 'services:'
   - name: celery-broker
     type: keyvalue
     plan: starter 
