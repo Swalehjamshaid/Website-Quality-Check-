@@ -1,18 +1,17 @@
 services:
-  - type: web # Your main application service
-    name: your-app-name-here # Replace with your app name
-    # ... other configuration (e.g., buildCommand, startCommand) ...
-    
+  - type: web
+    name: your-app-name-here 
+    # ... other config ...
     envVars:
-      # ... (your other env vars)
+      # ...
       - key: CELERY_RESULT_BACKEND
         fromService:
           type: keyValue
           name: celery-broker
+# The single service item ends here.
+# -------------------------------------------------------------
 
-# The services section above is now considered complete.
-
-resources: # <--- MUST ALIGN EXACTLY WITH 'services:' at Column 1
+resources: # <--- Must align with 'services:' and 'services:' above it
   - name: celery-broker
     type: keyValue
     plan: starter
