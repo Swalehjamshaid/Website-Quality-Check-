@@ -1,14 +1,10 @@
 services:
-  - type: worker
-    name: celery-scheduler
-    region: us-east
-    plan: starter
-    buildCommand: pip install -r requirements.txt
-    startCommand: celery -A app.celery_app beat --loglevel info
-
-resources:
-  - name: celery-broker
-    type: keyvalue
-    plan: starter
-    region: us-east
-    maxmemoryPolicy: noeviction
+  - type: web
+    name: rest-express
+    env: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
