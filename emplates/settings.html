@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow">
+    <h2 class="text-3xl font-bold mb-8">Email Report Settings</h2>
+    <form method="POST">
+        <div class="mb-6">
+            <label class="block font-bold mb-2">Report Frequency</label>
+            <select name="frequency" class="w-full border rounded-lg px-4 py-3" onchange="toggleDay(this)">
+                <option value="daily" {% if current_user.report_frequency == 'daily' %}selected{% endif %}>Daily</option>
+                <option value="weekly" {% if current_user.report_frequency == 'weekly' %}selected{% endif %}>Weekly</option>
+                <option value="monthly" {% if current_user.report_frequency == 'monthly' %}selected{% endif %}>Monthly</option>
+            </select>
+        </div>
+
+        <div class="mb-6">
+            <label class="block font-bold mb-2">Send Time (24h)</label>
+            <input name="time" type="time" value="{{ current_user.report_time }}" required class="w-full border rounded-lg px-4 py-3">
+        </div>
+
+        <div id="day-selector" class="mb-6 {% if current_user.report_frequency == 'daily' %}hidden{% endif %}">
+            <label class="block font-bold mb-2">Day of Week/Month</label>
+            <select name="day" class="w-full border rounded-lg px-4 py-3">
+                {% for day in days %}
+                <option value="{{ day }}" {% if current_user.report_day == day %}selected{% endif %}>{{ day }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <button type="submit" class="bg-indigo-700 text-white px-8 py-3 rounded-lg hover:bg-indigo-800">
+            Save Settings
+        </button>
+    </form>
+</div>
+
+<script>
+function toggleDay(sel) {
+    document.getElementById('day-selector').classList.toggle('hidden', sel.value === 'daily');
+}
+</script>
+{% endblock %}
