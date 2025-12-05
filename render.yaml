@@ -1,46 +1,51 @@
 
 services:
+  # Web service
   - type: web
     name: your-app-name-here
     plan: starter
-    region: us-east
+    region: virginia
     runtime: python
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app
+
     envVars:
       - key: CELERY_RESULT_BACKEND
         fromService:
-          type: redis
+          type: keyvalue
           name: celery-broker
           property: connectionString
       - key: CELERY_BROKER_URL
         fromService:
-          type: redis
+          type: keyvalue
           name: celery-broker
           property: connectionString
 
+  # Celery worker
   - type: worker
     name: celery-worker
     plan: starter
-    region: us-east
+    region: virginia
     runtime: python
     buildCommand: pip install -r requirements.txt
     startCommand: celery -A app.celery_app worker --loglevel=info
+
     envVars:
       - key: CELERY_RESULT_BACKEND
         fromService:
-          type: redis
+          type: keyvalue
           name: celery-broker
           property: connectionString
       - key: CELERY_BROKER_URL
         fromService:
-          type: redis
+          type: keyvalue
           name: celery-broker
           property: connectionString
 
-resources:
-  - name: celery-broker
-    type: redis
+  # Managed Redis/Key Value instance (lives under services, not resources)
+  - type: keyvalue        # 'redis' is a deprecated alias; 'keyvalue' is preferred
+    name: celery-broker
     plan: starter
-    region: us-east
+    region: virginia
+    ipAllowList: []       # allow only internal connections by default
     maxmemoryPolicy: noeviction
