@@ -1,20 +1,22 @@
+# render.yaml (Complete Blueprint File)
+
 # --- TOP-LEVEL SERVICES SECTION ---
 services:
-  - type: worker
+  - type: worker # <--- FIX for "expected 'type' in object"
     name: celery-scheduler
     region: us-east
     plan: starter
     buildCommand: pip install -r requirements.txt
-    startCommand: celery -A app.celery_app beat --loglevel info
-
+    startCommand: celery -A app.celery_app beat --loglevel info 
+    
     # Environment Variables (Config Vars)
     envVars:
       # SUPABASE CREDENTIALS
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
-        sync: false
-
+        sync: false # Ensure there is only one sync field here
+        
       # Celery broker configuration
       - key: CELERY_BROKER_URL
         fromService:
@@ -26,11 +28,11 @@ services:
           name: celery-broker
 
 # --- TOP-LEVEL RESOURCES SECTION (MUST BE AT ZERO INDENTATION) ---
-resources:
+resources: # <--- FIX for "Field resources not found in type File.Spec"
   # 4. DATA STORE (Redis/Key Value for Celery Broker)
   - name: celery-broker
-    type: keyvalue
-    plan: starter
+    type: keyvalue # <--- FIX for initial 'keyvalues' field error
+    plan: starter 
     region: us-east
     # Configuration properties for the Key Value store
     maxmemoryPolicy: noeviction
