@@ -1,7 +1,4 @@
-# Blueprint file must start with a key that defines a list (like 'services:' or 'resources:').
-# The error is solved by ensuring the services: key is present.
-
-services: # <--- THIS MUST BE THE FIRST STRUCTURAL KEY AT ZERO INDENTATION!
+services: # <--- Must be at zero indentation (Column 1)
   - type: worker 
     name: celery-scheduler
     region: us-east
@@ -9,10 +6,11 @@ services: # <--- THIS MUST BE THE FIRST STRUCTURAL KEY AT ZERO INDENTATION!
     buildCommand: pip install -r requirements.txt
     startCommand: celery -A app.celery_app beat --loglevel info 
     
+    # Environment Variables (Using the correct LIST format)
     envVars:
-      - key: SUPABASE_URL
+      - key: SUPABASE_URL # <-- FIX: Correct list item structure
         sync: false
-      - key: SUPABASE_SERVICE_ROLE_KEY
+      - key: SUPABASE_SERVICE_ROLE_KEY # <-- FIX: Correct list item structure
         sync: false
         
       - key: CELERY_BROKER_URL
@@ -24,7 +22,7 @@ services: # <--- THIS MUST BE THE FIRST STRUCTURAL KEY AT ZERO INDENTATION!
           type: keyValue
           name: celery-broker
 
-resources: # <--- This must align EXACTLY with 'services:' at the far left margin.
+resources: # <--- Must be at zero indentation (Column 1)
   - name: celery-broker
     type: keyvalue
     plan: starter 
