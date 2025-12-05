@@ -1,42 +1,76 @@
-# A single file to deploy all resources for your multi-process app
+# Blueprint for deploying your multi-service architecture (Web App, Celery Worker, Celery Beat, Redis Broker)
 services:
-  # 1. WEB SERVICE (Handles HTTP requests)
+  # 1. WEB SERVICE (Handles HTTP requests via Gunicorn)
   - type: web
     name: website-quality-check-web
     env: python
     region: us-east
-    plan: free # or starter
+    plan: starter # Changed to 'starter' for better reliability than 'free'
     buildCommand: "pip install -r requirements.txt"
-    startCommand: "gunicorn app:app" # Adjust 'app:app' if needed (e.g., 'wsgi:application' for Django)
+    # CRITICAL CORRECTION: Using 'wsgi:application' to match your project files (Procfile/wsgi.py)
+    startCommand: "gunicorn wsgi:application" 
+    envVars:
+      # INTEGRATED SECRET KEY: Render automatically generates a unique, secure key here
+      - key: SECRET_KEY
+        generateValue: true
+      # Include CELERY_RESULT_BACKEND for tracking task status
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: keyvalue
+          name: celery-broker
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          type: keyvalue
+          name: celery-broker
+      - key: PYTHONUNBUFFERED
+        value: "1" 
+
+  # 2. CELERY WORKER SERVICE (Executes the actual tasks from the queue)
+  - type: worker
+    name: website-celery-worker
+    env: python
+    region: us-east
+    plan: starter # Recommended plan for worker reliability
+    buildCommand: "pip install -r requirements.txt"
+    # CRITICAL CORRECTION: Targets the app.celery_app object based on your celery_worker.py file
+    startCommand: "celery -A app.celery_app worker --loglevel info"
     envVars:
       - key: CELERY_BROKER_URL
         fromService:
           type: keyvalue
           name: celery-broker
-      - key: PYTHONUNBUFFERED
-        value: "1" # Ensures logs are printed immediately
-
-  # 2. BACKGROUND WORKER (Handles Celery tasks)
-  - type: worker
-    name: website-celery-worker
-    env: python
-    region: us-east
-    plan: free # or starter
-    buildCommand: "pip install -r requirements.txt"
-    # This command starts the Celery worker process
-    startCommand: "celery -A celery_worker worker --loglevel info" # Adjust 'celery_worker' if your Celery app object is named differently
-    envVars:
-      - key: CELERY_BROKER_URL
+      - key: CELERY_RESULT_BACKEND
         fromService:
           type: keyvalue
           name: celery-broker
       - key: PYTHONUNBUFFERED
         value: "1"
 
-# 3. DATA STORE (Redis/Key Value for Celery Broker)
+  # 3. CELERY BEAT SERVICE (Runs the scheduler/crontab from celery_worker.py)
+  # This dedicated service is necessary to reliably run scheduled tasks (like daily audits)
+  - type: worker
+    name: website-celery-beat
+    env: python
+    region: us-east
+    plan: starter # Dedicated worker required for scheduled tasks
+    buildCommand: "pip install -r requirements.txt"
+    # Targets the app.celery_app object to run the scheduler
+    startCommand: "celery -A app.celery_app beat --loglevel info"
+    envVars:
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: keyvalue
+          name: celery-broker
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          type: keyvalue
+          name: celery-broker
+      - key: PYTHONUNBUFFERED
+        value: "1"
+
+# 4. DATA STORE (Redis/Key Value for Celery Broker)
 keyvalues:
   - name: celery-broker
-    plan: free # or starter
+    plan: starter # Changed to 'starter' for data persistence (Free tier does not persist data)
     region: us-east
-    # The noeviction policy is recommended for message queues to prevent losing tasks
     maxmemoryPolicy: noeviction
