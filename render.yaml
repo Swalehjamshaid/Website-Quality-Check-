@@ -9,18 +9,20 @@ services:
     startCommand: gunicorn app:app
 
     envVars:
-      # Other env vars here as needed
       - key: CELERY_RESULT_BACKEND
         fromService:
-          type: keyValue
+          type: redis
           name: celery-broker
+          property: connectionString
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: redis
+          name: celery-broker
+          property: connectionString
 
 resources:
   - name: celery-broker
-    type: keyValue
+    type: redis
     plan: starter
     region: us-east
-    # Optional: add key/values if you want to populate the resource
-    data:
-      CELERY_RESULT_BACKEND: "redis://:password@host:6379/0"
     maxmemoryPolicy: noeviction
