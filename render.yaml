@@ -7,17 +7,13 @@ services:
     startCommand: celery -A app.celery_app beat --loglevel info
     envVars:
       - key: SUPABASE_URL
-        sync: false
+        value: "<YOUR_SUPABASE_URL>"
       - key: SUPABASE_SERVICE_ROLE_KEY
-        sync: false
+        value: "<YOUR_SERVICE_ROLE_KEY>"
       - key: CELERY_BROKER_URL
-        fromService:
-          type: keyValue
-          name: celery-broker
+        value: "<YOUR_BROKER_URL>"
       - key: CELERY_RESULT_BACKEND
-        fromService:
-          type: keyValue
-          name: celery-broker
+        value: "<YOUR_RESULT_BACKEND_URL>"
 
 resources:
   - name: celery-broker
