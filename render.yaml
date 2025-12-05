@@ -1,24 +1,22 @@
 # render.yaml (Complete Blueprint File)
 
-# --- SERVICES SECTION (Defines your Celery Scheduler) ---
+# --- TOP-LEVEL SERVICES SECTION ---
 services:
-  - type: worker # Suitable for a Celery scheduler/worker
-    name: celery-scheduler # Name of the service
+  - name: celery-scheduler # Name of the service being configured
     region: us-east
-    plan: starter # Dedicated scheduler for scheduled tasks
+    plan: starter
     buildCommand: pip install -r requirements.txt
-    startCommand: celery -A app.celery_app beat --loglevel info # Targets the app.celery_app object to run the scheduler
+    startCommand: celery -A app.celery_app beat --loglevel info 
     
     # Environment Variables (Config Vars)
     envVars:
-      # --- SUPABASE CREDENTIALS ---
+      # SUPABASE CREDENTIALS
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
         
       # Celery broker configuration
-      # These reference the 'celery-broker' resource defined below in the 'resources' block
       - key: CELERY_BROKER_URL
         fromService:
           type: keyValue
@@ -28,13 +26,12 @@ services:
           type: keyValue
           name: celery-broker
 
-# --- RESOURCES SECTION (Defines the Redis/Key Value Store) ---
-# This block MUST be at the same indentation level as 'services:'
-resources:
+# --- TOP-LEVEL RESOURCES SECTION (MUST BE AT ZERO INDENTATION) ---
+resources: # <-- FIX: This must be at the far left margin (zero indentation)
   # 4. DATA STORE (Redis/Key Value for Celery Broker)
   - name: celery-broker # Name used in the 'fromService' references above
     type: keyvalue # Defines it as a Key Value resource (Redis)
-    plan: starter # Provides data persistence, recommended for queues
+    plan: starter 
     region: us-east
     # Configuration properties for the Key Value store
     maxmemoryPolicy: noeviction
