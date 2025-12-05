@@ -22,7 +22,6 @@ services:
           name: celery-broker
 
 resources:
-  # This MUST align exactly with 'services:' above.
   - name: celery-broker
     type: keyvalue
     plan: starter 
