@@ -7,7 +7,25 @@ services:
     runtime: python
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app
+    envVars:
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          type: redis
+          name: celery-broker
+          property: connectionString
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: redis
+          name: celery-broker
+          property: connectionString
 
+  - type: worker
+    name: celery-worker
+    plan: starter
+    region: us-east
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: celery -A app.celery_app worker --loglevel=info
     envVars:
       - key: CELERY_RESULT_BACKEND
         fromService:
