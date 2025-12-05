@@ -1,9 +1,9 @@
-# ... (Line 3 is likely the start of the last envVar item)
-- key: CELERY_RESULT_BACKEND
-  fromService:
-    type: keyValue
-    name: celery-broker # <--- This line ends the fromService map
-    # A list item ends here, but is not visually closed, causing resources: to be nested
+# ... (Lines 1-6 are the preceding context)
+# 6.   name: celery-broker
 
-resources: # <--- Error: Parser tries to nest this inside the previous list item
-  # ...
+# Add a blank line here for clear separation
+resources: # <--- Keep this at Column 1
+# 9.   # 3. KEY-VALUE STORE (Redis for Celery Broker)
+# 10.  - name: celery-broker
+# 11.    type: keyValue
+# ...
