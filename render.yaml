@@ -1,17 +1,26 @@
+
 services:
   - type: web
-    name: your-app-name-here # Replace with your app name
-    # ... other configuration (e.g., buildCommand, startCommand) ...
-    
+    name: your-app-name-here
+    plan: starter
+    region: us-east
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+
     envVars:
-      # ... (your other env vars)
+      # Other env vars here as needed
       - key: CELERY_RESULT_BACKEND
         fromService:
           type: keyValue
-          name: celery-broker # <--- This is the last line of the services list item
-resources: # <--- MUST be at Column 1, IMMEDIATELY after the last line of the item
+          name: celery-broker
+
+resources:
   - name: celery-broker
     type: keyValue
     plan: starter
     region: us-east
+    # Optional: add key/values if you want to populate the resource
+    data:
+      CELERY_RESULT_BACKEND: "redis://:password@host:6379/0"
     maxmemoryPolicy: noeviction
