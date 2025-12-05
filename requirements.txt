@@ -1,43 +1,20 @@
-Flask==3.0.3
-Flask-SQLAlchemy==3.1.1
+Flask==2.3.3
+Flask-SQLAlchemy==3.0.5
 Flask-Login==0.6.3
 Flask-Bcrypt==1.0.1
-Flask-WTF==1.2.1
-WTForms==3.1.2
-SQLAlchemy==2.0.35
-Werkzeug==3.0.4
-Jinja2==3.1.4
-itsdangerous==2.2.0
+SQLAlchemy==2.0.23
+Werkzeug==2.3.7
+Jinja2==3.1.2
+itsdangerous==2.1.2
 click==8.1.7
-
-# PDF Generation
-WeasyPrint==62.3
-cairocffi==1.7.1
-CairoSVG==2.7.1
-cffi==1.17.1
-Pillow==10.4.0
-
-# Web Scraping & Parsing
-requests==2.32.3
-beautifulsoup4==4.12.3
-lxml==5.3.0
-
-# Charts in PDF
-matplotlib==3.9.2
-
-# Background Tasks (Celery + Redis)
-celery==5.4.0
-redis==5.0.8
-flower==2.0.1          # optional – to monitor tasks
-
-# Email
-email-validator==2.2.0
-
-# Environment variables
-python-dotenv==1.0.1
-
-# Gunicorn for production (needed on Render/Vercel/Render/Railway)
-gunicorn==23.0.0
-
-# Optional but recommended
-python-dateutil==2.9.0.post0
+WeasyPrint==59.0
+beautifulsoup4==4.12.2
+requests==2.31.0
+lxml==4.9.3
+Pillow==10.0.1
+matplotlib==3.7.5
+celery==5.3.4
+redis==5.0.1
+gunicorn==21.2.0
+python-dotenv==1.0.0
+email-validator==2.1.1
