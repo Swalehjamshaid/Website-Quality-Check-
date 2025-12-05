@@ -5,7 +5,7 @@ services:
     name: website-quality-check-web
     env: python
     region: us-east
-    plan: starter # Changed to 'starter' for better reliability than 'free'
+    plan: starter # Recommended plan for a production web service
     buildCommand: "pip install -r requirements.txt"
     # CRITICAL CORRECTION: Using 'wsgi:application' to match your project files (Procfile/wsgi.py)
     startCommand: "gunicorn wsgi:application" 
@@ -14,13 +14,14 @@ services:
       - key: SECRET_KEY
         generateValue: true
       
-      # === SUPABASE CREDENTIALS (Anon key needed for client interaction) ===
+      # === SUPABASE CREDENTIALS (CRITICAL: Removed hardcoded values for security) ===
+      # These variables must now be set in the Render Dashboard after deployment!
       - key: SUPABASE_URL
-        value: "https://uytkmnbeafbplccmbaaq.supabase.co"
+        sync: false
       - key: SUPABASE_ANON_KEY
-        value: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5dGttbmJlYWZicGxjY21iYWJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQxNjk5OTAsImV4cCI6MjA3OTc0NTk5MH0.eff-1L5VSVPNjzsLxeSeUK7vXxa4udKi3KDN4DsPzBY"
-      - key: SUPABASE_SERVICE_ROLE_KEY # Needed for server-side operations
-        value: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5dGttbmJlYWZicGxjY21iYWJxIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NDE2OTk5MCwiZXhwIjoyMDc5NzQ1OTkwfQ.kipPHFN1Q0KoyUcGm7LSuFW058k-odqfC0MgcNtlvyk"
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
 
       # Celery broker configuration
       - key: CELERY_BROKER_URL
@@ -44,11 +45,11 @@ services:
     # CRITICAL CORRECTION: Targets the app.celery_app object based on your celery_worker.py file
     startCommand: "celery -A app.celery_app worker --loglevel info"
     envVars:
-      # === SUPABASE CREDENTIALS (Worker needs the Service Role key for database writes) ===
+      # === SUPABASE CREDENTIALS (CRITICAL: Removed hardcoded values for security) ===
       - key: SUPABASE_URL
-        value: "https://uytkmnbeafbplccmbaaq.supabase.co"
+        sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
-        value: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5dGttbmJlYWZicGxjY21iYWJxIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NDE2OTk5MCwiZXhwIjoyMDc5NzQ1OTkwfQ.kipPHFN1Q0KoyUcGm7LSuFW058k-odqfC0MgcNtlvyk"
+        sync: false
       
       # Celery broker configuration
       - key: CELERY_BROKER_URL
@@ -72,11 +73,11 @@ services:
     # Targets the app.celery_app object to run the scheduler
     startCommand: "celery -A app.celery_app beat --loglevel info"
     envVars:
-      # === SUPABASE CREDENTIALS (Beat needs the Service Role key for database writes) ===
+      # === SUPABASE CREDENTIALS (CRITICAL: Removed hardcoded values for security) ===
       - key: SUPABASE_URL
-        value: "https://uytkmnbeafbplccmbaaq.supabase.co"
+        sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
-        value: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5dGttbmJlYWZicGxjY21iYWJxIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NDE2OTk5MCwiZXhwIjoyMDc5NzQ1OTkwfQ.kipPHFN1Q0KoyUcGm7LSuFW058k-odqfC0MgcNtlvyk"
+        sync: false
       
       # Celery broker configuration
       - key: CELERY_BROKER_URL
