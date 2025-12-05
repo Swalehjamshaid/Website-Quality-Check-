@@ -1,13 +1,10 @@
-
 services:
   # Web service
   - type: web
-    name: your-app-name-here
+    name: website-quality-check
     plan: starter
     region: virginia
-    runtime: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app
+    dockerfilePath: Dockerfile
 
     envVars:
       - key: CELERY_RESULT_BACKEND
@@ -20,15 +17,19 @@ services:
           type: keyvalue
           name: celery-broker
           property: connectionString
+      - key: SUPABASE_URL
+        value: https://<your-project-ref>.supabase.co
+      - key: SUPABASE_ANON_KEY
+        value: <your-anon-key>
+      - key: SUPABASE_SERVICE_KEY
+        value: <your-service-role-key>
 
   # Celery worker
   - type: worker
     name: celery-worker
     plan: starter
     region: virginia
-    runtime: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: celery -A app.celery_app worker --loglevel=info
+    dockerfilePath: Dockerfile
 
     envVars:
       - key: CELERY_RESULT_BACKEND
@@ -42,10 +43,10 @@ services:
           name: celery-broker
           property: connectionString
 
-  # Managed Redis/Key Value instance (lives under services, not resources)
-  - type: keyvalue        # 'redis' is a deprecated alias; 'keyvalue' is preferred
+  # Redis / Key Value store
+  - type: keyvalue
     name: celery-broker
     plan: starter
     region: virginia
-    ipAllowList: []       # allow only internal connections by default
+    ipAllowList: []
     maxmemoryPolicy: noeviction
