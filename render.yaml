@@ -1,4 +1,4 @@
-# render.yaml (Production-ready Blueprint for Render)
+# render.yaml (Corrected Production-ready Blueprint for Render)
 
 # --- TOP-LEVEL SERVICES SECTION ---
 services:
@@ -8,18 +8,13 @@ services:
     plan: starter
     buildCommand: pip install -r requirements.txt
     startCommand: celery -A app.celery_app beat --loglevel info
-    concurrency: 2                 # Number of worker processes (adjust as needed)
-    healthCheckPath: /health       # Optional endpoint to verify worker is running
 
     # Environment Variables (Config Vars)
     envVars:
-      # SUPABASE CREDENTIALS
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
-
-      # Celery broker configuration
       - key: CELERY_BROKER_URL
         fromService:
           type: keyValue
