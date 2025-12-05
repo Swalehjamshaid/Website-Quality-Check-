@@ -1,8 +1,8 @@
 # render.yaml (Complete Blueprint File)
 
 # --- TOP-LEVEL SERVICES SECTION ---
-services: # <--- MUST start at the far left margin (ZERO INDENTATION)
-  - type: worker # FIX for "expected 'type' in object"
+services: # <--- MUST start at column 1 (ZERO INDENTATION)
+  - type: worker # <--- FIX for "expected 'type' in object"
     name: celery-scheduler
     region: us-east
     plan: starter
@@ -28,7 +28,7 @@ services: # <--- MUST start at the far left margin (ZERO INDENTATION)
           name: celery-broker
 
 # --- TOP-LEVEL RESOURCES SECTION ---
-resources: # <--- FIX: This MUST start at the far left margin (ZERO INDENTATION)
+resources: # <--- FIX: MUST start at column 1 (ZERO INDENTATION)
   # This fixes the "Field resources not found in type File.Spec" error.
   - name: celery-broker
     type: keyvalue # Fixes the original 'keyvalues' field error
