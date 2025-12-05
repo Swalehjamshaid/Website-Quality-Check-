@@ -1,12 +1,12 @@
-services: # <--- MUST be the first key at zero indentation
-  - type: worker 
+services: # <--- CRITICAL: This must be present and at ZERO indentation
+  - type: worker # Fixes 'expected "type" in object' error
     name: celery-scheduler
     region: us-east
     plan: starter
     buildCommand: pip install -r requirements.txt
     startCommand: celery -A app.celery_app beat --loglevel info 
     
-    envVars: # MUST use the list format below
+    envVars:
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
@@ -21,7 +21,7 @@ services: # <--- MUST be the first key at zero indentation
           type: keyValue
           name: celery-broker
 
-resources: # <--- MUST align with 'services:' at zero indentation
+resources: # <--- This must align exactly with 'services:' at ZERO indentation
   - name: celery-broker
     type: keyvalue
     plan: starter 
