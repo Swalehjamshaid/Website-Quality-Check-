@@ -1,20 +1,42 @@
+# A single file to deploy all resources for your multi-process app
 services:
+  # 1. WEB SERVICE (Handles HTTP requests)
   - type: web
-    name: website-quality-check
+    name: website-quality-check-web
     env: python
-    region: oregon
-    # ⬆️ Updated: 'starter' is a deprecated plan. 'pro' is a common modern equivalent.
-    plan: pro
-    
+    region: us-east
+    plan: free # or starter
     buildCommand: "pip install -r requirements.txt"
-    startCommand: "gunicorn wsgi:app"
-    autoDeploy: true
-    
+    startCommand: "gunicorn app:app" # Adjust 'app:app' if needed (e.g., 'wsgi:application' for Django)
     envVars:
-      - key: FLASK_ENV
-        value: production
-      # ⚠️ Recommendation: For better security, consider adding SECRET_KEY 
-      # directly in the Render dashboard as a Secret Environment Variable 
-      # instead of hardcoding it here.
-      - key: SECRET_KEY
-        value: 37metrics-secret-2025
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: keyvalue
+          name: celery-broker
+      - key: PYTHONUNBUFFERED
+        value: "1" # Ensures logs are printed immediately
+
+  # 2. BACKGROUND WORKER (Handles Celery tasks)
+  - type: worker
+    name: website-celery-worker
+    env: python
+    region: us-east
+    plan: free # or starter
+    buildCommand: "pip install -r requirements.txt"
+    # This command starts the Celery worker process
+    startCommand: "celery -A celery_worker worker --loglevel info" # Adjust 'celery_worker' if your Celery app object is named differently
+    envVars:
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: keyvalue
+          name: celery-broker
+      - key: PYTHONUNBUFFERED
+        value: "1"
+
+# 3. DATA STORE (Redis/Key Value for Celery Broker)
+keyvalues:
+  - name: celery-broker
+    plan: free # or starter
+    region: us-east
+    # The noeviction policy is recommended for message queues to prevent losing tasks
+    maxmemoryPolicy: noeviction
