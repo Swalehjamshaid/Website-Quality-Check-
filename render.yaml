@@ -1,11 +1,15 @@
+# render.yaml (Complete Blueprint File)
+
+# --- SERVICES SECTION (Defines your Celery Scheduler) ---
 services:
-# 1. Celery Worker/Scheduler Service (Lines 70-80 in your screenshot)
-  - type: worker # The service type is 'worker' or 'cron' based on startCommand
-    name: celery-scheduler
+  - type: worker # Suitable for a Celery scheduler/worker
+    name: celery-scheduler # Name of the service
     region: us-east
-    plan: starter
+    plan: starter # Dedicated scheduler for scheduled tasks
     buildCommand: pip install -r requirements.txt
-    startCommand: celery -A app.celery_app beat --loglevel info # Using 'beat' suggests it's a scheduler
+    startCommand: celery -A app.celery_app beat --loglevel info # Targets the app.celery_app object to run the scheduler
+    
+    # Environment Variables (Config Vars)
     envVars:
       # --- SUPABASE CREDENTIALS ---
       - key: SUPABASE_URL
@@ -14,7 +18,7 @@ services:
         sync: false
         
       # Celery broker configuration
-      # These reference the 'celery-broker' resource defined below
+      # These reference the 'celery-broker' resource defined below in the 'resources' block
       - key: CELERY_BROKER_URL
         fromService:
           type: keyValue
@@ -24,12 +28,13 @@ services:
           type: keyValue
           name: celery-broker
 
-# 2. Redis/Key Value Store Resource (The fixed section)
+# --- RESOURCES SECTION (Defines the Redis/Key Value Store) ---
+# This block MUST be at the same indentation level as 'services:'
 resources:
   # 4. DATA STORE (Redis/Key Value for Celery Broker)
   - name: celery-broker # Name used in the 'fromService' references above
-    type: keyvalue # <-- FIX: Defines it as a Key Value resource (Redis)
+    type: keyvalue # Defines it as a Key Value resource (Redis)
     plan: starter # Provides data persistence, recommended for queues
     region: us-east
     # Configuration properties for the Key Value store
-    maxmemoryPolicy: noeviction # Recommended for job queues to prevent loss of tasks
+    maxmemoryPolicy: noeviction
