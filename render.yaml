@@ -4,14 +4,12 @@ services:
     region: us-east
     plan: starter
     buildCommand: pip install -r requirements.txt
-    startCommand: celery -A app.celery_app beat --loglevel info 
-    
+    startCommand: celery -A app.celery_app beat --loglevel info
     envVars:
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
-        
       - key: CELERY_BROKER_URL
         fromService:
           type: keyValue
@@ -24,6 +22,6 @@ services:
 resources:
   - name: celery-broker
     type: keyvalue
-    plan: starter 
+    plan: starter
     region: us-east
     maxmemoryPolicy: noeviction
