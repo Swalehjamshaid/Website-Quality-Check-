@@ -1,15 +1,20 @@
 services:
   - type: web # Your main application service
-    # ... other configuration ...
+    name: your-app-name-here # Replace with your app name
+    # ... other configuration (e.g., buildCommand, startCommand) ...
+    
     envVars:
+      # ... (your other env vars)
       - key: CELERY_RESULT_BACKEND
         fromService:
           type: keyValue
           name: celery-broker
-  # <--- CRITICAL: If you have more services, they would go here.
-  # If this is your ONLY service, the 'services' key is closed AFTER this line.
 
-resources: # <--- MUST be at the same level as the 'services:' key (Column 1)
+# The services section above is now considered complete.
+
+resources: # <--- MUST ALIGN EXACTLY WITH 'services:' at Column 1
   - name: celery-broker
     type: keyValue
-    # ... rest of the resource block
+    plan: starter
+    region: us-east
+    maxmemoryPolicy: noeviction
