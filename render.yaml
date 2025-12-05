@@ -1,22 +1,17 @@
-# render.yaml (Complete Blueprint File)
-
-# --- TOP-LEVEL SERVICES SECTION ---
-services: # <--- 1. MUST start at the far left margin (ZERO INDENTATION)
-  - type: worker 
+services:
+  - type: worker
     name: celery-scheduler
     region: us-east
     plan: starter
     buildCommand: pip install -r requirements.txt
     startCommand: celery -A app.celery_app beat --loglevel info 
     
-    # Environment Variables (Config Vars)
     envVars:
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
         
-      # Celery broker configuration
       - key: CELERY_BROKER_URL
         fromService:
           type: keyValue
@@ -26,9 +21,8 @@ services: # <--- 1. MUST start at the far left margin (ZERO INDENTATION)
           type: keyValue
           name: celery-broker
 
-# --- TOP-LEVEL RESOURCES SECTION ---
-resources: # <--- 2. MUST start at the far left margin (ZERO INDENTATION)
-  # This fixes the "Field resources not found in type File.Spec" error.
+resources:
+  # This MUST align exactly with 'services:' above.
   - name: celery-broker
     type: keyvalue
     plan: starter 
