@@ -1,15 +1,9 @@
-services:
-  - type: web
-    # ... web service configuration
-    envVars: # <-- envVars list starts here
-      - key: SOME_KEY
-        value: SOME_VALUE
-      - key: CELERY_RESULT_BACKEND # <-- This is the last item of the list
-        fromService:
-          type: keyValue
-          name: celery-broker
-    # The services block for this item ends here
+# ... (Line 3 is likely the start of the last envVar item)
+- key: CELERY_RESULT_BACKEND
+  fromService:
+    type: keyValue
+    name: celery-broker # <--- This line ends the fromService map
+    # A list item ends here, but is not visually closed, causing resources: to be nested
 
-resources: # <-- The top-level resources section must be here
-  - name: celery-broker
-    # ... etc.
+resources: # <--- Error: Parser tries to nest this inside the previous list item
+  # ...
