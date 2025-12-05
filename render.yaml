@@ -1,14 +1,12 @@
-# render.yaml (Complete Blueprint File)
-
 # --- TOP-LEVEL SERVICES SECTION ---
 services:
-  - type: worker # <-- FIX: Added the missing mandatory 'type' field
+  - type: worker
     name: celery-scheduler
     region: us-east
     plan: starter
     buildCommand: pip install -r requirements.txt
-    startCommand: celery -A app.celery_app beat --loglevel info 
-    
+    startCommand: celery -A app.celery_app beat --loglevel info
+
     # Environment Variables (Config Vars)
     envVars:
       # SUPABASE CREDENTIALS
@@ -16,8 +14,7 @@ services:
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
-        sync: false # Corrected indentation for the second sync
-        
+
       # Celery broker configuration
       - key: CELERY_BROKER_URL
         fromService:
@@ -33,7 +30,7 @@ resources:
   # 4. DATA STORE (Redis/Key Value for Celery Broker)
   - name: celery-broker
     type: keyvalue
-    plan: starter 
+    plan: starter
     region: us-east
     # Configuration properties for the Key Value store
     maxmemoryPolicy: noeviction
