@@ -11,7 +11,7 @@ WeasyPrint==58.4       # Lower version to use prebuilt wheels
 beautifulsoup4==4.12.2
 requests==2.31.0
 lxml==4.9.2            # Compatible prebuilt wheel
-Pillow==9.5.0          # Compatible prebuilt wheel
++ Pillow>=11.1.0
 matplotlib==3.7.5
 gunicorn==21.2.0
 python-dotenv==1.0.0
