@@ -1,4 +1,4 @@
-services: # <--- THIS IS THE MISSING/STRUCTURALLY INCORRECT KEY!
+services: # <--- CRITICAL: This must be present and at ZERO indentation
   - type: worker 
     name: celery-scheduler
     region: us-east
