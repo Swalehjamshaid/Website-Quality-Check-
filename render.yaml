@@ -1,11 +1,29 @@
-services: # <--- FIX: This MUST be the top-level key, ending with a colon
-  - type: web
-    name: rest-express
-    env: node
-    plan: free
-    # Force install of devDependencies (vite, esbuild, tsx) needed for the build script
-    buildCommand: npm install --production=false && npm run build
-    startCommand: npm run start
-    envVars:
-      - key: NODE_ENV
-        value: production
+services: # <--- MUST be the first key at zero indentation
+  - type: worker 
+    name: celery-scheduler
+    region: us-east
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: celery -A app.celery_app beat --loglevel info 
+    
+    envVars: # MUST use the list format below
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+        
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: keyValue
+          name: celery-broker
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          type: keyValue
+          name: celery-broker
+
+resources: # <--- MUST align with 'services:' at zero indentation
+  - name: celery-broker
+    type: keyvalue
+    plan: starter 
+    region: us-east
+    maxmemoryPolicy: noeviction
