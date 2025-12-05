@@ -1,4 +1,18 @@
-services: # <--- CRITICAL: Must be at ZERO indentation (Column 1)
+services: # <--- MUST be at zero indentation (Column 1)
+
+  # 1. WEB SERVICE (Your Express/Node.js App)
+  - type: web 
+    name: rest-express
+    env: node
+    plan: free
+    # FIX: Add rootDir to resolve the "ENOENT: package.json" error.
+    # Adjust the path below if your package.json is not in a folder named 'backend'
+    rootDir: ./backend 
+    buildCommand: npm install --production=false && npm run build
+    startCommand: npm run start
+    # You may need to add SUPABASE env vars here if your Express app uses them
+    
+  # 2. WORKER SERVICE (Your Celery Scheduler/Worker)
   - type: worker 
     name: celery-scheduler
     region: us-east
@@ -7,11 +21,13 @@ services: # <--- CRITICAL: Must be at ZERO indentation (Column 1)
     startCommand: celery -A app.celery_app beat --loglevel info 
     
     envVars:
+      # SUPABASE Credentials
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
         
+      # Celery Broker configuration (References the resource below)
       - key: CELERY_BROKER_URL
         fromService:
           type: keyValue
@@ -21,7 +37,8 @@ services: # <--- CRITICAL: Must be at ZERO indentation (Column 1)
           type: keyValue
           name: celery-broker
 
-resources: # <--- Must align exactly with 'services:' at ZERO indentation (Column 1)
+resources: # <--- MUST align exactly with 'services:' at zero indentation (Column 1)
+  # 3. KEY-VALUE STORE (Redis for Celery Broker)
   - name: celery-broker
     type: keyvalue
     plan: starter 
