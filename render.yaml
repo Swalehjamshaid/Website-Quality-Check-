@@ -1,14 +1,15 @@
-# ... (Lines 1-36 remain the same, defining services, envVars, etc.)
-# The preceding envVar section ends here (line 36):
-#   - key: CELERY_RESULT_BACKEND
-#     fromService:
-#       type: keyValue
-#       name: celery-broker
+services:
+  - type: web
+    # ... web service configuration
+    envVars: # <-- envVars list starts here
+      - key: SOME_KEY
+        value: SOME_VALUE
+      - key: CELERY_RESULT_BACKEND # <-- This is the last item of the list
+        fromService:
+          type: keyValue
+          name: celery-broker
+    # The services block for this item ends here
 
-resources: # <-- THIS LINE MUST START at Column 1 (ZERO indentation)
-  # 3. KEY-VALUE STORE (Redis for Celery Broker)
+resources: # <-- The top-level resources section must be here
   - name: celery-broker
-    type: keyValue
-    plan: starter
-    region: us-east
-    maxmemoryPolicy: noeviction
+    # ... etc.
