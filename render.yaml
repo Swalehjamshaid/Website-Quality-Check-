@@ -1,30 +1,19 @@
-services: # <--- Must be at zero indentation (Column 1)
-  - type: worker 
+services:
+  - type: worker
     name: celery-scheduler
     region: us-east
     plan: starter
     buildCommand: pip install -r requirements.txt
-    startCommand: celery -A app.celery_app beat --loglevel info 
-    
-    # Environment Variables (Using the correct LIST format)
+    startCommand: celery -A app.celery_app beat --loglevel info
     envVars:
-      - key: SUPABASE_URL # <-- FIX: Correct list item structure
-        sync: false
-      - key: SUPABASE_SERVICE_ROLE_KEY # <-- FIX: Correct list item structure
-        sync: false
-        
-      - key: CELERY_BROKER_URL
-        fromService:
-          type: keyValue
-          name: celery-broker
-      - key: CELERY_RESULT_BACKEND
-        fromService:
-          type: keyValue
-          name: celery-broker
+      SUPABASE_URL: "<YOUR_SUPABASE_URL>"
+      SUPABASE_SERVICE_ROLE_KEY: "<YOUR_SERVICE_ROLE_KEY>"
+      CELERY_BROKER_URL: "<YOUR_BROKER_URL>"
+      CELERY_RESULT_BACKEND: "<YOUR_RESULT_BACKEND_URL>"
 
-resources: # <--- Must be at zero indentation (Column 1)
+resources:
   - name: celery-broker
     type: keyvalue
-    plan: starter 
+    plan: starter
     region: us-east
     maxmemoryPolicy: noeviction
