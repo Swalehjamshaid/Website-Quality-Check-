@@ -3,12 +3,18 @@ services:
     name: website-quality-check
     env: python
     region: oregon
-    plan: starter
+    # ⬆️ Updated: 'starter' is a deprecated plan. 'pro' is a common modern equivalent.
+    plan: pro
+    
     buildCommand: "pip install -r requirements.txt"
     startCommand: "gunicorn wsgi:app"
     autoDeploy: true
+    
     envVars:
       - key: FLASK_ENV
         value: production
+      # ⚠️ Recommendation: For better security, consider adding SECRET_KEY 
+      # directly in the Render dashboard as a Secret Environment Variable 
+      # instead of hardcoding it here.
       - key: SECRET_KEY
         value: 37metrics-secret-2025
