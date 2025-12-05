@@ -1,9 +1,10 @@
-services:
+ervices:
   - type: web
     name: rest-express
     env: node
     plan: free
-    buildCommand: npm install && npm run build
+    # Force install of devDependencies (vite, esbuild, tsx) needed for the build script
+    buildCommand: npm install --production=false && npm run build
     startCommand: npm run start
     envVars:
       - key: NODE_ENV
