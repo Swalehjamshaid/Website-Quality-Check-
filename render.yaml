@@ -1,7 +1,7 @@
 # render.yaml (Complete Blueprint File)
 
 # --- TOP-LEVEL SERVICES SECTION ---
-services:
+services: # <--- MUST start at the far left margin (ZERO INDENTATION)
   - type: worker # <--- FIX for "expected 'type' in object"
     name: celery-scheduler
     region: us-east
@@ -15,7 +15,7 @@ services:
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
-        sync: false # Ensure there is only one sync field here
+        sync: false
         
       # Celery broker configuration
       - key: CELERY_BROKER_URL
@@ -27,12 +27,11 @@ services:
           type: keyValue
           name: celery-broker
 
-# --- TOP-LEVEL RESOURCES SECTION (MUST BE AT ZERO INDENTATION) ---
+# --- TOP-LEVEL RESOURCES SECTION ---
 resources: # <--- FIX for "Field resources not found in type File.Spec"
-  # 4. DATA STORE (Redis/Key Value for Celery Broker)
+  # This key MUST start at the far left margin (ZERO INDENTATION)
   - name: celery-broker
-    type: keyvalue # <--- FIX for initial 'keyvalues' field error
+    type: keyvalue
     plan: starter 
     region: us-east
-    # Configuration properties for the Key Value store
     maxmemoryPolicy: noeviction
