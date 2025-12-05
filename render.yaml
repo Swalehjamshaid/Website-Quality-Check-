@@ -1,43 +1,14 @@
-services: # <--- MUST be at ZERO indentation (Column 1)
+# ... (Lines 1-36 remain the same, defining services, envVars, etc.)
+# The preceding envVar section ends here (line 36):
+#   - key: CELERY_RESULT_BACKEND
+#     fromService:
+#       type: keyValue
+#       name: celery-broker
 
-  # 1. WEB SERVICE (rest-express) - FIXES ENOENT ERROR
-  - type: web # Mandatory 'type' field
-    name: rest-express
-    env: node
-    plan: free
-    # FIX: rootDir resolves the 'ENOENT: package.json' error.
-    rootDir: ./backend # <--- ADJUST THIS PATH if package.json is elsewhere (e.g., ./api)
-    buildCommand: npm install --production=false && npm run build
-    startCommand: npm run start
-    # Include Express app specific env vars here if needed
-
-  # 2. WORKER SERVICE (celery-scheduler) - FIXES MISSING 'TYPE'
-  - type: worker 
-    name: celery-scheduler
-    region: us-east
-    plan: starter
-    buildCommand: pip install -r requirements.txt
-    startCommand: celery -A app.celery_app beat --loglevel info 
-    
-    envVars:
-      - key: SUPABASE_URL
-        sync: false
-      - key: SUPABASE_SERVICE_ROLE_KEY
-        sync: false
-        
-      - key: CELERY_BROKER_URL
-        fromService:
-          type: keyValue
-          name: celery-broker
-      - key: CELERY_RESULT_BACKEND
-        fromService:
-          type: keyValue
-          name: celery-broker
-
-resources: # <--- MUST align exactly with 'services:' at ZERO indentation (Column 1)
+resources: # <-- THIS LINE MUST START at Column 1 (ZERO indentation)
   # 3. KEY-VALUE STORE (Redis for Celery Broker)
   - name: celery-broker
-    type: keyvalue
-    plan: starter 
+    type: keyValue
+    plan: starter
     region: us-east
     maxmemoryPolicy: noeviction
