@@ -2,7 +2,8 @@
 
 # --- TOP-LEVEL SERVICES SECTION ---
 services:
-  - name: celery-scheduler # Name of the service being configured
+  - type: worker # <-- FIX: Added the missing mandatory 'type' field
+    name: celery-scheduler
     region: us-east
     plan: starter
     buildCommand: pip install -r requirements.txt
@@ -15,6 +16,7 @@ services:
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
+        sync: false # Corrected indentation for the second sync
         
       # Celery broker configuration
       - key: CELERY_BROKER_URL
@@ -27,10 +29,10 @@ services:
           name: celery-broker
 
 # --- TOP-LEVEL RESOURCES SECTION (MUST BE AT ZERO INDENTATION) ---
-resources: # <-- FIX: This must be at the far left margin (zero indentation)
+resources:
   # 4. DATA STORE (Redis/Key Value for Celery Broker)
-  - name: celery-broker # Name used in the 'fromService' references above
-    type: keyvalue # Defines it as a Key Value resource (Redis)
+  - name: celery-broker
+    type: keyvalue
     plan: starter 
     region: us-east
     # Configuration properties for the Key Value store
