@@ -1,4 +1,4 @@
-ervices:
+services: # <--- FIX: This MUST be the top-level key, ending with a colon
   - type: web
     name: rest-express
     env: node
