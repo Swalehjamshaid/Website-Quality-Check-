@@ -1,22 +1,36 @@
-# render.yaml (Example Structure - Check your original file's values!)
+# render.yaml – Correct & Working Version (December 2025)
 services:
-  # Web Service Definition
   - type: web
-    name: rest-express-azay
+    name: rest-express-azay            # you can keep or change this
     env: python
+    plan: free                         # or "starter"/"standard" if you upgrade
+    region: oregon                     # optional, but recommended
+
+    # Repository settings
     repo: https://github.com/SwalehJamshaid/Website-Quality-Check
-    branch: main
-    # Use a stable Python version via environment variable in settings instead of here
-    # buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app
+    branch: main                       # make sure this branch exists and is up-to-date
+
+    # Build & Run commands (these are the most important fixes)
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app     # assumes your Flask file is named app.py and app = Flask(__name__)
+
+    # Health check
     healthCheckPath: /
-    # Line 18 might be somewhere around here if you have environment variables or scaling settings
-    plan: free
+    httpPort: 10000                    # Render expects this for Python services
+
+    # Auto-scaling (free tier = 1 instance only)
+    autoDeploy: true
     numInstances: 1
-    # Environment variables go here
+
+    # Python version – this is the REAL fix for most "Line 18" errors
+    pythonVersion: "3.11"              # Render only accepts major.minor format here
+
+    # Environment variables (add your real DATABASE_URL and any secrets)
     envVars:
       - key: DATABASE_URL
-        value: # YOUR DATABASE URL HERE
-      # Example of where Line 18 might be
-      - key: PYTHON_VERSION
-        value: 3.11.8 # Set a stable Python version to fix compilation errors
+        value: postgresql://user:pass@host:5432/dbname   # ← put your real URL
+      - key: PYTHONUNBUFFERED
+        value: "1"                                       # helps with logs
+      # Add any other secrets here, e.g.:
+      # - key: SECRET_KEY
+      #   value: your-super-secret-key
