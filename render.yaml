@@ -5,14 +5,13 @@ services:
     region: oregon
     plan: free
 
-    repo: https://github.com/Swalehjamshaid/Website-Quality-Check.git
-    branch: YOUR_BRANCH_NAME   # ← MUST match GitHub EXACTLY
+    repo: https://github.com/Swalehjamshaid/Website-Quality-Check-.git
+    branch: main
 
     dockerfilePath: Dockerfile
-
-    healthCheckPath: /
-
     autoDeployTrigger: commit
+
+    healthCheckPath: "/"
 
     envVars:
       - key: PYTHONUNBUFFERED
