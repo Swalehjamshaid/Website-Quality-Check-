@@ -2,31 +2,34 @@
 # Nixpacks Configuration for a Pure Python/Flask Application
 # =========================================================
 
-# Phase 1: Setup (Ensure necessary system tools and WeasyPrint dependencies are available)
+# Phase 1: Setup
 [phases.setup]
 # Specifies the base versions of Python and core build tools
 nixPkgs = ["python311", "pip", "gnumake", "gcc"]
 
-# CRUCIAL FIX: Added libgobject-2.0-0 and other dependencies to fix the OSError
-# caused by the WeasyPrint library missing system components (GObject, Pango, etc.).
+# FIX: Added necessary system libraries (via aptPkgs) to support WeasyPrint.
+# These libraries (GObject, Pango, Cairo) are required for PDF generation.
 aptPkgs = [
-    "libgobject-2.0-0",  # Fixes: cannot load library 'libgobject-2.0-0'
+    "libgobject-2.0-0",
     "libpango-1.0-0",
     "libpangoft2-1.0-0",
     "libharfbuzz0b",
     "libxml2-dev",
     "libxslt1-dev",
     "libjpeg-dev",
+    "libcairo2-dev",
+    "libgirepository1.0-dev",
 ]
 
-# Phase 2: Install (Runs 'pip install -r requirements.txt' automatically)
-# No custom command needed here.
+# Phase 2: Install
+# Nixpacks automatically runs 'pip install -r requirements.txt'.
 
-# Phase 3: Start (Defines the command to start the web application)
+# Phase 3: Start
 [start]
-# Command to start the Gunicorn server, binding to the port provided by Railway ($PORT)
-cmd = "gunicorn app:app --bind 0.0.0.0:$PORT"
+# CORRECTED: Uses 'wsgi:application' based on your wsgi.py file, 
+# ensuring Gunicorn finds the correct callable.
+cmd = "gunicorn wsgi:application --bind 0.0.0.0:$PORT"
 
-# Final Build Configuration: Explicitly forces the Python builder.
+# Final Build Configuration
 [build]
 name = "python"
