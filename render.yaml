@@ -1,5 +1,7 @@
 services:
-  # Main Web Service (Flask + Gunicorn)
+  # ──────────────────────────────
+  # 1. Web Service (Flask + Gunicorn)
+  # ──────────────────────────────
   - type: web
     name: website-quality-check
     runtime: docker
@@ -14,9 +16,11 @@ services:
       - key: PYTHONUNBUFFERED
         value: "1"
       - key: SECRET_KEY
-        generateValue: true   # Auto-generates secure key
+        generateValue: true   # Render auto-generates a secure key
 
-  # Background Worker (Celery)
+  # ──────────────────────────────
+  # 2. Background Worker (Celery)
+  # ──────────────────────────────
   - type: worker
     name: website-quality-check-worker
     runtime: docker
@@ -30,5 +34,6 @@ services:
         value: "1"
       - key: SECRET_KEY
         fromService:
-          name: website-quality-check
-          envVarKey: SECRET_KEY
+          type: web                     # ← THIS LINE WAS MISSING
+          name: website-quality-check   # ← exact web service name
+          envVarKey: SECRET_KEY         # ← key generated above
