@@ -1,52 +1,22 @@
+# render.yaml (Example Structure - Check your original file's values!)
 services:
-  # Web service
+  # Web Service Definition
   - type: web
-    name: website-quality-check
-    plan: starter
-    region: virginia
-    dockerfilePath: Dockerfile
-
+    name: rest-express-azay
+    env: python
+    repo: https://github.com/SwalehJamshaid/Website-Quality-Check
+    branch: main
+    # Use a stable Python version via environment variable in settings instead of here
+    # buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    healthCheckPath: /
+    # Line 18 might be somewhere around here if you have environment variables or scaling settings
+    plan: free
+    numInstances: 1
+    # Environment variables go here
     envVars:
-      - key: CELERY_RESULT_BACKEND
-        fromService:
-          type: keyvalue
-          name: celery-broker
-          property: connectionString
-      - key: CELERY_BROKER_URL
-        fromService:
-          type: keyvalue
-          name: celery-broker
-          property: connectionString
-      - key: SUPABASE_URL
-        value: https://<your-project-ref>.supabase.co
-      - key: SUPABASE_ANON_KEY
-        value: <your-anon-key>
-      - key: SUPABASE_SERVICE_KEY
-        value: <your-service-role-key>
-
-  # Celery worker
-  - type: worker
-    name: celery-worker
-    plan: starter
-    region: virginia
-    dockerfilePath: Dockerfile
-
-    envVars:
-      - key: CELERY_RESULT_BACKEND
-        fromService:
-          type: keyvalue
-          name: celery-broker
-          property: connectionString
-      - key: CELERY_BROKER_URL
-        fromService:
-          type: keyvalue
-          name: celery-broker
-          property: connectionString
-
-  # Redis / Key Value store
-  - type: keyvalue
-    name: celery-broker
-    plan: starter
-    region: virginia
-    ipAllowList: []
-    maxmemoryPolicy: noeviction
+      - key: DATABASE_URL
+        value: # YOUR DATABASE URL HERE
+      # Example of where Line 18 might be
+      - key: PYTHON_VERSION
+        value: 3.11.8 # Set a stable Python version to fix compilation errors
