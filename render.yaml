@@ -1,37 +1,19 @@
 services:
-  # Web App
   - type: web
     name: website-quality-check
     runtime: docker
     region: oregon
     plan: free
-    repo: https://github.com/Swalehjamshaid/Website-Quality-Check   # ← no .git
-    # branch line removed → Render auto-uses the default branch (main)
+
+    repo: https://github.com/Swalehjamshaid/Website-Quality-Check.git
+    branch: YOUR_BRANCH_NAME   # ← MUST match GitHub EXACTLY
+
     dockerfilePath: Dockerfile
+
     healthCheckPath: /
-    autoDeploy: true
+
+    autoDeployTrigger: commit
 
     envVars:
       - key: PYTHONUNBUFFERED
         value: "1"
-      - key: SECRET_KEY
-        generateValue: true
-
-  # Celery Worker
-  - type: worker
-    name: website-quality-check-worker
-    runtime: docker
-    region: oregon
-    plan: free
-    repo: https://github.com/Swalehjamshaid/Website-Quality-Check   # ← no .git
-    dockerfilePath: Dockerfile
-    dockerCommand: celery -A app.celery_app worker --loglevel=info
-
-    envVars:
-      - key: PYTHONUNBUFFERED
-        value: "1"
-      - key: SECRET_KEY
-        fromService:
-          type: web
-          name: website-quality-check
-          envVarKey: SECRET_KEY
