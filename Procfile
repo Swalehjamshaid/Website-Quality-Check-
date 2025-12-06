@@ -1,2 +1,3 @@
-web: gunicorn app:app
-celery: celery -A celery_worker app_worker --loglevel=info
+web: npm start
+# web: gunicorn app:app
+# web: uvicorn main:app --host 0.0.0.0 --port $PORT
