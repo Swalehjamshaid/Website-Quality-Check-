@@ -1,4 +1,3 @@
-
 # render.yaml — Docker-based web service (Blueprint)
 services:
   - type: web
@@ -9,7 +8,7 @@ services:
 
     # Repo & branch
     repo: https://github.com/Swalehjamshaid/Website-Quality-Check.git
-    branch: main
+    branch: master  # Changed from 'main' to 'master' - adjust if needed
 
     # Build from your Dockerfile at the repo root
     dockerfilePath: Dockerfile
@@ -21,4 +20,4 @@ services:
 
     envVars:
       - key: PYTHONUNBUFFERED
-        value: '1'
+        value: "1"
