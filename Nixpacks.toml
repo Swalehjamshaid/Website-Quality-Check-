@@ -22,7 +22,7 @@ aptPkgs = [
 
 # Phase 3: Start (Defines the command to start the web application)
 [start]
-# CRITICAL FIX: Ensures only the executable command is present.
+# Ensures only the executable command is present.
 cmd = "gunicorn app:app --bind 0.0.0.0:$PORT"
 
 # Final Build Configuration: Explicitly forces the Python builder.
