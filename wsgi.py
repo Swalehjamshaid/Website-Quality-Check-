@@ -1,7 +1,7 @@
 # wsgi.py
 
-# Assuming your application object is named 'app' in 'app.py'
-from app import app as application
+# Import the application factory function from your main application file
+from app import create_app
 
-# The 'application' variable is now the callable that Gunicorn can use
-# (If you kept 'web: gunicorn wsgi:application' in the Procfile)
+# Create the application object instance using the factory function
+application = create_app()
