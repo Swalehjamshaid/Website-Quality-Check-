@@ -1,20 +1,10 @@
-Flask==2.3.2
-Flask-SQLAlchemy==3.0.5
-Flask-Login==0.6.3
-Flask-Bcrypt==1.0.1
-SQLAlchemy==2.0.23
-Werkzeug==2.3.7
-Jinja2==3.1.2
-itsdangerous==2.1.2
-click==8.1.7
-WeasyPrint==59.0           # now works with Docker
-beautifulsoup4==4.12.2
-requests==2.31.0
-lxml==4.9.3                 # now works with Docker
-Pillow==10.0.1              # now works with Docker
-matplotlib==3.7.5
+# requirements.txt
+# Check for and update any packages that are failing the install
+Flask==2.3.3
 gunicorn==21.2.0
-python-dotenv==1.0.0
-email-validator==2.1.1
-celery==5.3.1
-redis==5.3.0
+python-dotenv==1.0.1
+celery==5.3.6
+# Add all your other specific dependencies here.
+# Example problematic package fix:
+# If 'psycopg2' fails, use the binary version:
+# psycopg2-binary==2.9.9
