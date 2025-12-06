@@ -4,15 +4,19 @@ services:
     runtime: docker
     region: oregon
     plan: free
-
-    repo: https://github.com/Swalehjamshaid/Website-Quality-Check-.git
-    branch: main
-
+    # Fixed repo URL (no .git, no trailing hyphen in name)
+    repo: https://github.com/Swalehjamshaid/Website-Quality-Check
+    # Branch omitted—auto-uses default (main) to avoid validation errors
     dockerfilePath: Dockerfile
-    autoDeployTrigger: commit
+    autoDeploy: true  # Locked for commit-based deploys
 
-    healthCheckPath: "/"
+    healthCheckPath: /
 
     envVars:
       - key: PYTHONUNBUFFERED
-        value: "1"
+        value: "1"  # Locked as requested—improves log output
+      - key: SECRET_KEY
+        generateValue: true  # Auto-generates secure key for Flask
+      # Add more if needed (e.g., for DB/Celery):
+      # - key: DATABASE_URL
+      #   sync: false  # Set in Render dashboard for security
