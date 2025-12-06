@@ -17,8 +17,8 @@ aptPkgs = [
     "libxml2-dev",
     "libxslt1-dev",
     "libjpeg-dev",
-    "libcairo2-dev",
-    "libgirepository1.0-dev",
+    "libcairo2-dev",
+    "libgirepository1.0-dev",
 ]
 
 # Phase 2: Install
@@ -26,8 +26,7 @@ aptPkgs = [
 
 # Phase 3: Start
 [start]
-# CORRECTED: Uses 'wsgi:application' based on your wsgi.py file, 
-# ensuring Gunicorn finds the correct callable.
+# CORRECTED: Uses 'wsgi:application' to load the app instance defined in wsgi.py
 cmd = "gunicorn wsgi:application --bind 0.0.0.0:$PORT"
 
 # Final Build Configuration
