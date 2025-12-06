@@ -23,7 +23,6 @@ from email import encoders
 from urllib3.exceptions import InsecureRequestWarning
 import urllib3 
 
-# CRITICAL FIX: The invisible U+00A0 character was removed from the line below.
 # Suppress InsecureRequestWarning globally for auditing purposes
 urllib3.disable_warnings(InsecureRequestWarning)
 
@@ -33,7 +32,7 @@ urllib3.disable_warnings(InsecureRequestWarning)
 db = SQLAlchemy()
 bcrypt = Bcrypt()
 login_manager = LoginManager()
-celery_app = Celery(__name__) 
+celery_app = Celery(__name__) # FIX: Non-breaking space removed here.
 
 # Assumed Model Definitions (defined here for completeness)
 class User(UserMixin, db.Model):
