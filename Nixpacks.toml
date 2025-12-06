@@ -2,13 +2,13 @@
 # Nixpacks Configuration for a Pure Python/Flask Application
 # =========================================================
 
-# Phase 1: Setup (Ensure necessary system tools are available)
+# Phase 1: Setup (Ensure necessary system tools and WeasyPrint dependencies are available)
 [phases.setup]
-# Specifies the exact versions of Python and system packages to use (Nixpkgs names)
+# Specifies the base versions of Python and core build tools
 nixPkgs = ["python311", "pip", "gnumake", "gcc"]
 
-# Force installation of system libraries required for WeasyPrint (PDF generation)
-# By setting these explicitly here, we ensure they are installed correctly.
+# CRUCIAL FIX: Force installation of system libraries required for WeasyPrint (PDF generation)
+# These package names are the correct runtime and dev libraries for Debian-based images.
 aptPkgs = [
     "libpango-1.0-0",
     "libpangoft2-1.0-0",
@@ -19,8 +19,7 @@ aptPkgs = [
 ]
 
 # Phase 2: Install (Runs 'pip install -r requirements.txt' automatically)
-[phases.install]
-# We don't need any custom commands here, Nixpacks handles the pip install based on 'aptPkgs' above.
+# No custom command needed here.
 
 # Phase 3: Start (Defines the command to start the web application)
 [start]
@@ -28,7 +27,8 @@ aptPkgs = [
 # as defined in your Procfile's 'web' process.
 cmd = "gunicorn app:app --bind 0.0.0.0:$PORT"
 
-# Overrides the default language detection and ensures only the Python builder is used.
-# This prevents Nixpacks from incorrectly detecting Node.js and running 'npm install'.
+# Final Build Configuration: Explicitly forces the Python builder.
+# This prevents Nixpacks from incorrectly detecting Node.js (via stray package.json remnants) 
+# and running the failing 'npm install' command.
 [build]
 name = "python"
