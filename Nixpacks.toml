@@ -7,16 +7,16 @@
 # Specifies the base versions of Python and core build tools
 nixPkgs = ["python311", "pip", "gnumake", "gcc"]
 
-# CRUCIAL FIX: Added libgobject-2.0-0 to fix the OSError crash and ensures all other 
-# WeasyPrint system dependencies are installed.
+# CRUCIAL FIX: Added libgobject-2.0-0 and other dependencies to fix the OSError
+# caused by the WeasyPrint library missing system components (GObject, Pango, etc.).
 aptPkgs = [
-    "libgobject-2.0-0",  # <--- FIX for OSError: cannot load library 'libgobject-2.0-0'
-    "libpango-1.0-0",
-    "libpangoft2-1.0-0",
-    "libharfbuzz0b",
-    "libxml2-dev",
-    "libxslt1-dev",
-    "libjpeg-dev",
+    "libgobject-2.0-0",  # Fixes: cannot load library 'libgobject-2.0-0'
+    "libpango-1.0-0",
+    "libpangoft2-1.0-0",
+    "libharfbuzz0b",
+    "libxml2-dev",
+    "libxslt1-dev",
+    "libjpeg-dev",
 ]
 
 # Phase 2: Install (Runs 'pip install -r requirements.txt' automatically)
@@ -24,7 +24,7 @@ aptPkgs = [
 
 # Phase 3: Start (Defines the command to start the web application)
 [start]
-# Ensures only the executable command is present (Fix for "Runs: command not found")
+# Command to start the Gunicorn server, binding to the port provided by Railway ($PORT)
 cmd = "gunicorn app:app --bind 0.0.0.0:$PORT"
 
 # Final Build Configuration: Explicitly forces the Python builder.
