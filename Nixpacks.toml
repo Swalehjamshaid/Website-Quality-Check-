@@ -1,0 +1,11 @@
+# Nixpacks.toml – overrides Nixpacks defaults
+providers = ["node"]        # or "python", "rust", "go", etc.
+
+[phases.setup]
+nixPkgs = ["nodejs_20", "yarn"]
+
+[phases.build]
+cmds = ["yarn install --frozen-lockfile", "yarn build"]
+
+[start]
+cmd = "yarn start"
