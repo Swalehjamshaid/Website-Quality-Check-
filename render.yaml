@@ -7,19 +7,18 @@ services:
     region: oregon
     plan: free
 
-    # Your actual repo and branch (from your screenshot)
-    repo: https://github.com/Swalehjamshaid/Website-Quality-Check
+    # Repo & branch (explicit .git suffix to avoid URL ambiguity)
+    repo: https://github.com/Swalehjamshaid/Website-Quality-Check.git
     branch: main
 
     # Build from your Dockerfile at the repo root
     dockerfilePath: Dockerfile
 
-    # Render health check endpoint path (your app must return 200 here)
+    # Health check path (your app must return HTTP 200 here)
     healthCheckPath: /
 
     autoDeploy: true
 
-    # Optional environment variables
     envVars:
       - key: PYTHONUNBUFFERED
-        value: "1"
+        value: "1
