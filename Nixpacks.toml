@@ -1,34 +1,22 @@
-# =========================================================
-# Nixpacks Configuration for a Pure Python/Flask Application
-# =========================================================
-
-# Phase 1: Setup
+# Nixpacks configuration for Python + system deps required by WeasyPrint
 [phases.setup]
-# Specifies the base versions of Python and core build tools
 nixPkgs = ["python311", "pip", "gnumake", "gcc"]
-
-# FIX: Added necessary system libraries (via aptPkgs) to support WeasyPrint.
-# These libraries (GObject, Pango, Cairo) are required for PDF generation.
 aptPkgs = [
-    "libgobject-2.0-0", # CRITICAL FIX for the OSError
-    "libpango-1.0-0",
-    "libpangoft2-1.0-0",
-    "libharfbuzz0b",
-    "libxml2-dev",
-    "libxslt1-dev",
-    "libjpeg-dev",
-    "libcairo2-dev",
-    "libgirepository1.0-dev",
+"libgobject-2.0-0",
+"libpango-1.0-0",
+"libpangoft2-1.0-0",
+"libharfbuzz0b",
+"libxml2-dev",
+"libxslt1-dev",
+"libjpeg-dev",
+"libcairo2-dev",
+"libgirepository1.0-dev",
 ]
 
-# Phase 2: Install
-# Nixpacks automatically runs 'pip install -r requirements.txt'.
 
-# Phase 3: Start
 [start]
-# CORRECTED: Uses 'wsgi:application' to load the app instance defined in wsgi.py
 cmd = "gunicorn wsgi:application --bind 0.0.0.0:$PORT"
 
-# Final Build Configuration
+
 [build]
 name = "python"
