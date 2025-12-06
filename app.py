@@ -18,8 +18,10 @@ from celery import Celery
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', '37metrics-secret-2025')
 
-# Render persistent disk DB
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:////var/data/monitor.db')
+# 🚨 FIX APPLIED HERE: Changed fallback from persistent disk path to ensure PostgreSQL is used on Render.
+# The app will now connect to the 'DATABASE_URL' environment variable (which should be your Postgres URL).
+# The 'sqlite:///temp.db' fallback is only for local testing when DATABASE_URL is not set.
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///temp.db') 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Celery configuration
@@ -103,7 +105,8 @@ def load_user(user_id):
 # INITIALIZE DB + ADMIN USER
 # ---------------------------------------------------------
 with app.app_context():
-    db.create_all()
+    # NOTE: This db.create_all() will now run against the PostgreSQL database!
+    db.create_all() 
     if not User.query.filter_by(email='roy.jamshaid@gmail.com').first():
         admin = User(
             name="Roy Jamshaid",
