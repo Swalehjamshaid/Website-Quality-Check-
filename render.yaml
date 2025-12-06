@@ -1,33 +1,27 @@
 
-# render.yaml — Minimal & Schema-Valid (Dec 2025)
+# render.yaml — Schema-valid for Blueprints
 services:
   - type: web
-    name: <YOUR_SERVICE_NAME>                # e.g., website-quality-check
-    runtime: python                          # Render auto-detects from requirements.txt
-    region: oregon                           # or keep default
+    name: website-quality-check            # <— change to your service name
+    runtime: python
+    region: oregon                         # optional
+    plan: free                             # or starter, etc.
 
-    # Link to your repo and the EXACT branch name
-    repo: <YOUR_GITHUB_REPO_URL>             # e.g., https://github.com/your-org/your-repo
-    branch: <YOUR_BRANCH>                    # e.g., main OR master (must exist!)
+    # Link to your repo and branch
+    repo: https://github.com/your-org/your-repo
+    branch: main                           # <— use the EXACT branch that exists (e.g., master)
 
-    # Build & Start (Flask example)
+    # Build & start
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 120
 
-    # Health Check (make sure your Flask app returns 200 on this path)
+    # Health check — use ONLY this field
     healthCheckPath: /
-    healthCheck:
-      path: /
-      intervalSeconds: 10
-      timeoutSeconds: 5
-      failureThreshold: 3
 
     autoDeploy: true
-    plan: free                                # change to starter or above for more resources
 
     envVars:
       - key: PYTHONUNBUFFERED
         value: "1"
-      # Example: If you need a DB URL, define it here or via Render dashboard
       # - key: DATABASE_URL
-      #   value: "postgres://..."
+      #   value: postgres://....
