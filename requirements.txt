@@ -7,5 +7,6 @@ beautifulsoup4==4.12.3
 WeasyPrint==61.2
 matplotlib==3.8.2
 celery==5.3.6
-gunicorn==21.2.0  # Required for the 'web' start command
-redis==5.0.1      # Required for Celery broker/backend
+gunicorn==21.2.0
+redis==5.0.1
+psycopg2-binary # Added for PostgreSQL database connection
