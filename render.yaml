@@ -8,7 +8,7 @@ services:
 
     # Repo & branch
     repo: https://github.com/Swalehjamshaid/Website-Quality-Check.git
-    branch: master  # Changed from 'main' to 'master' - adjust if needed
+    branch: main
 
     # Build from your Dockerfile at the repo root
     dockerfilePath: Dockerfile
