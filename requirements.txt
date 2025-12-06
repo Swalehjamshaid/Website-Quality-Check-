@@ -1,10 +1,11 @@
-# requirements.txt
-# Check for and update any packages that are failing the install
 Flask==2.3.3
-gunicorn==21.2.0
-python-dotenv==1.0.1
+Flask-SQLAlchemy==3.1.1
+Flask-Login==0.6.3
+Flask-Bcrypt==1.0.1
+requests==2.31.0
+beautifulsoup4==4.12.3
+WeasyPrint==61.2
+matplotlib==3.8.2
 celery==5.3.6
-# Add all your other specific dependencies here.
-# Example problematic package fix:
-# If 'psycopg2' fails, use the binary version:
-# psycopg2-binary==2.9.9
+gunicorn==21.2.0  # Required for the 'web' start command
+redis==5.0.1      # Required for Celery broker/backend
