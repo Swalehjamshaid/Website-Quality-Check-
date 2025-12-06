@@ -7,8 +7,7 @@
 # Specifies the base versions of Python and core build tools
 nixPkgs = ["python311", "pip", "gnumake", "gcc"]
 
-# CRUCIAL FIX 1: Force installation of system libraries required for WeasyPrint (PDF generation)
-# These package names are the correct runtime and dev libraries for Debian-based images.
+# CRUCIAL FIX: Force installation of system libraries required for WeasyPrint (PDF generation)
 aptPkgs = [
     "libpango-1.0-0",
     "libpangoft2-1.0-0",
@@ -23,8 +22,7 @@ aptPkgs = [
 
 # Phase 3: Start (Defines the command to start the web application)
 [start]
-# CRUCIAL FIX 2: Removed the descriptive text ("Runs the Flask app via Gunicorn") 
-# and left only the executable command.
+# CRITICAL FIX: Ensures only the executable command is present.
 cmd = "gunicorn app:app --bind 0.0.0.0:$PORT"
 
 # Final Build Configuration: Explicitly forces the Python builder.
