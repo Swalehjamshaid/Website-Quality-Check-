@@ -1,11 +1,8 @@
-# Defines the main web application process (Gunicorn)
-# 'app' is the module name (app.py), and the second 'app' is the object 
-# returned by create_app() which is globally assigned to 'app' in app.py.
+# Web process: Runs the Flask app via Gunicorn
 web: gunicorn app:app --bind 0.0.0.0:$PORT
 
-# Defines the Celery worker process to handle audit_website tasks
-# 'app.celery_app' is the Celery application instance in the app.py module.
+# Worker process: Runs Celery to process queued tasks (e.g., audit_website)
 worker: celery -A app.celery_app worker --loglevel=info
 
-# Defines the Celery beat scheduler for recurring daily_audit_all tasks
+# Scheduler process: Runs Celery beat to schedule recurring tasks (e.g., daily_audit_all)
 scheduler: celery -A app.celery_app beat --loglevel=info
