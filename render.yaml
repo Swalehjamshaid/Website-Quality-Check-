@@ -1,22 +1,34 @@
-# render.yaml — Docker-based web service (Blueprint)
 services:
+  # Main Web Service (Flask + Gunicorn)
   - type: web
     name: website-quality-check
     runtime: docker
-    region: oregon
+    repo: https://github.com/SwalehJamshaid/Website-Quality-Check
     plan: free
-
-    # Repo (branch will be auto-detected)
-    repo: https://github.com/Swalehjamshaid/Website-Quality-Check.git
-
-    # Build from your Dockerfile at the repo root
+    region: oregon
     dockerfilePath: Dockerfile
-
-    # Render health check (your app must return HTTP 200 on this path)
     healthCheckPath: /
-
     autoDeploy: true
 
     envVars:
       - key: PYTHONUNBUFFERED
         value: "1"
+      - key: SECRET_KEY
+        generateValue: true   # Auto-generates secure key
+
+  # Background Worker (Celery)
+  - type: worker
+    name: website-quality-check-worker
+    runtime: docker
+    repo: https://github.com/SwalehJamshaid/Website-Quality-Check
+    dockerfilePath: Dockerfile
+    plan: free
+    dockerCommand: celery -A app.celery_app worker --loglevel=info
+
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: SECRET_KEY
+        fromService:
+          name: website-quality-check
+          envVarKey: SECRET_KEY
