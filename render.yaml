@@ -1,24 +1,14 @@
-
-# render.yaml — Docker-based web service (Blueprint)
 services:
   - type: web
     name: website-quality-check
     runtime: docker
     region: oregon
     plan: free
-
-    # ✅ Correct username casing and branch
     repo: https://github.com/Swalehjamshaid/Website-Quality-Check.git
-    branch: main
-
-    # Build from your Dockerfile at repo root
+    branch: master   # ← try this
     dockerfilePath: Dockerfile
-
-    # Health check path (must return HTTP 200)
     healthCheckPath: /
-
     autoDeploy: true
-
     envVars:
       - key: PYTHONUNBUFFERED
         value: '1'
