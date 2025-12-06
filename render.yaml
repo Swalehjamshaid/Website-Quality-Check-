@@ -1,36 +1,34 @@
-# render.yaml – Correct & Working Version (December 2025)
-services:
-  - type: web
-    name: rest-express-azay            # you can keep or change this
-    env: python
-    plan: free                         # or "starter"/"standard" if you upgrade
-    region: oregon                     # optional, but recommended
+# render.yaml – Fixed for Render Blueprint Schema (Dec 2025)
+blueprints:
+  - name: Website-Quality-Check  # Matches your service name
+    services:
+      - type: web
+        name: rest-express-azay  # Keep or update to match your repo
+        env: python  # This enables Python runtime (no separate pythonVersion)
+        plan: free  # Or "starter"/"standard" if upgrading
+        region: oregon  # Optional, recommended for low latency
 
-    # Repository settings
-    repo: https://github.com/SwalehJamshaid/Website-Quality-Check
-    branch: main                       # make sure this branch exists and is up-to-date
+        # Repository settings
+        repo: https://github.com/SwalehJamshaid/Website-Quality-Check
+        branch: main  # Ensure this branch has your code
 
-    # Build & Run commands (these are the most important fixes)
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app     # assumes your Flask file is named app.py and app = Flask(__name__)
+        # Build & Run commands (essential for Python/Flask)
+        buildCommand: pip install -r requirements.txt  # Installs deps like Flask, gunicorn
+        startCommand: gunicorn app:app  # Assumes app.py with app = Flask(__name__)
 
-    # Health check
-    healthCheckPath: /
-    httpPort: 10000                    # Render expects this for Python services
+        # Health check (Render pings this path)
+        healthCheckPath: /
 
-    # Auto-scaling (free tier = 1 instance only)
-    autoDeploy: true
-    numInstances: 1
+        # Auto-deploy and scaling (free tier limits to 1 instance)
+        autoDeploy: true
+        numInstances: 1
 
-    # Python version – this is the REAL fix for most "Line 18" errors
-    pythonVersion: "3.11"              # Render only accepts major.minor format here
-
-    # Environment variables (add your real DATABASE_URL and any secrets)
-    envVars:
-      - key: DATABASE_URL
-        value: postgresql://user:pass@host:5432/dbname   # ← put your real URL
-      - key: PYTHONUNBUFFERED
-        value: "1"                                       # helps with logs
-      # Add any other secrets here, e.g.:
-      # - key: SECRET_KEY
-      #   value: your-super-secret-key
+        # Environment variables (add real values; sync with dashboard)
+        envVars:
+          - key: DATABASE_URL
+            value: postgresql://user:pass@host:5432/dbname  # Replace with your actual DB URL
+          - key: PYTHONUNBUFFERED
+            value: "1"  # Improves log visibility
+          # Add more as needed, e.g.:
+          # - key: SECRET_KEY
+          #   value: your-app-secret
