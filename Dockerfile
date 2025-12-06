@@ -1,23 +1,18 @@
-# Use a stable Python version
-FROM python:3.11-slim
-
-# Install system libraries needed for Pillow, lxml, WeasyPrint
-RUN apt-get update && apt-get install -y \
-    libjpeg-dev zlib1g-dev libfreetype6-dev libharfbuzz-dev libfribidi-dev \
-    libcairo2 libcairo2-dev libpango-1.0-0 libgdk-pixbuf2.0-0 libffi-dev \
-    build-essential \
- && rm -rf /var/lib/apt/lists/*
-
-# Set working directory
+# Example for Node.js / Next.js / Vite / etc.
+FROM node:20-alpine AS builder
 WORKDIR /app
-
-# Copy requirements and install Python packages
-COPY requirements.txt .
-RUN pip install --upgrade pip
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy app code
+COPY package*.json ./
+RUN npm ci
 COPY . .
+RUN npm run build
 
-# Render port fix: Use $PORT env var
-CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-5000} app:app"]
+FROM node:20-alpine
+WORKDIR /app
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/node_modules ./node_modules
+
+EXPOSE 3000
+ENV PORT=3000
+CMD ["npm", "start"]
