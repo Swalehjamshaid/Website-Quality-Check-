@@ -1,5 +1,34 @@
-# Use this to ensure a specific, modern Python version is used by Nixpacks
-# You can change 3.11 to your preferred version (e.g., 3.10, 3.12).
+# =========================================================
+# Nixpacks Configuration for a Pure Python/Flask Application
+# =========================================================
 
+# Phase 1: Setup (Ensure necessary system tools are available)
+[phases.setup]
+# Specifies the exact versions of Python and system packages to use (Nixpkgs names)
+nixPkgs = ["python311", "pip", "gnumake", "gcc"]
+
+# Force installation of system libraries required for WeasyPrint (PDF generation)
+# By setting these explicitly here, we ensure they are installed correctly.
+aptPkgs = [
+    "libpango-1.0-0",
+    "libpangoft2-1.0-0",
+    "libharfbuzz0b",
+    "libxml2-dev",
+    "libxslt1-dev",
+    "libjpeg-dev",
+]
+
+# Phase 2: Install (Runs 'pip install -r requirements.txt' automatically)
 [phases.install]
-pkgs = ["python311", "pip"]
+# We don't need any custom commands here, Nixpacks handles the pip install based on 'aptPkgs' above.
+
+# Phase 3: Start (Defines the command to start the web application)
+[start]
+# Explicitly sets the command to run the web server using Gunicorn, 
+# as defined in your Procfile's 'web' process.
+cmd = "gunicorn app:app --bind 0.0.0.0:$PORT"
+
+# Overrides the default language detection and ensures only the Python builder is used.
+# This prevents Nixpacks from incorrectly detecting Node.js and running 'npm install'.
+[build]
+name = "python"
