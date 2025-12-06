@@ -1,11 +1,10 @@
 services:
-  # ──────────────────────────────
-  # 1. Web Service (Flask + Gunicorn)
-  # ──────────────────────────────
+  # Web App (Flask + Gunicorn)
   - type: web
     name: website-quality-check
     runtime: docker
     repo: https://github.com/SwalehJamshaid/Website-Quality-Check
+    branch: main
     plan: free
     region: oregon
     dockerfilePath: Dockerfile
@@ -16,17 +15,16 @@ services:
       - key: PYTHONUNBUFFERED
         value: "1"
       - key: SECRET_KEY
-        generateValue: true   # Render auto-generates a secure key
+        generateValue: true
 
-  # ──────────────────────────────
-  # 2. Background Worker (Celery)
-  # ──────────────────────────────
+  # Celery Worker
   - type: worker
     name: website-quality-check-worker
     runtime: docker
     repo: https://github.com/SwalehJamshaid/Website-Quality-Check
-    dockerfilePath: Dockerfile
+    branch: main
     plan: free
+    dockerfilePath: Dockerfile
     dockerCommand: celery -A app.celery_app worker --loglevel=info
 
     envVars:
@@ -34,6 +32,6 @@ services:
         value: "1"
       - key: SECRET_KEY
         fromService:
-          type: web                     # ← THIS LINE WAS MISSING
-          name: website-quality-check   # ← exact web service name
-          envVarKey: SECRET_KEY         # ← key generated above
+          type: web
+          name: website-quality-check
+          envVarKey: SECRET_KEY
