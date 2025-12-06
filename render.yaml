@@ -1,27 +1,25 @@
 
-# render.yaml — Schema-valid for Blueprints
+# render.yaml — Docker-based web service (Blueprints)
 services:
   - type: web
-    name: website-quality-check            # <— change to your service name
-    runtime: python
-    region: oregon                         # optional
-    plan: free                             # or starter, etc.
+    name: website-quality-check
+    runtime: docker
+    region: oregon
+    plan: free
 
-    # Link to your repo and branch
-    repo: https://github.com/your-org/your-repo
-    branch: main                           # <— use the EXACT branch that exists (e.g., master)
+    # Your actual repo and branch
+    repo: https://github.com/Swalehjamshaid/Website-Quality-Check
+    branch: main
 
-    # Build & start
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 120
+    # Tell Render to build from your Dockerfile at the repo root
+    dockerfilePath: Dockerfile
 
-    # Health check — use ONLY this field
+    # Render performs health checks on this path
     healthCheckPath: /
 
     autoDeploy: true
 
+    # Optional environment variables (add more if needed)
     envVars:
       - key: PYTHONUNBUFFERED
         value: "1"
-      # - key: DATABASE_URL
-      #   value: postgres://....
