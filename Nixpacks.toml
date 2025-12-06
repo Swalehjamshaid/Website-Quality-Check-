@@ -7,7 +7,7 @@
 # Specifies the base versions of Python and core build tools
 nixPkgs = ["python311", "pip", "gnumake", "gcc"]
 
-# CRUCIAL FIX: Force installation of system libraries required for WeasyPrint (PDF generation)
+# CRUCIAL FIX 1: Force installation of system libraries required for WeasyPrint (PDF generation)
 # These package names are the correct runtime and dev libraries for Debian-based images.
 aptPkgs = [
     "libpango-1.0-0",
@@ -23,12 +23,10 @@ aptPkgs = [
 
 # Phase 3: Start (Defines the command to start the web application)
 [start]
-# Explicitly sets the command to run the web server using Gunicorn, 
-# as defined in your Procfile's 'web' process.
+# CRUCIAL FIX 2: Removed the descriptive text ("Runs the Flask app via Gunicorn") 
+# and left only the executable command.
 cmd = "gunicorn app:app --bind 0.0.0.0:$PORT"
 
 # Final Build Configuration: Explicitly forces the Python builder.
-# This prevents Nixpacks from incorrectly detecting Node.js (via stray package.json remnants) 
-# and running the failing 'npm install' command.
 [build]
 name = "python"
