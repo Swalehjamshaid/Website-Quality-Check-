@@ -1,10 +1,9 @@
 services:
-  # Web App (Flask + Gunicorn)
+  # Web Service (Flask App)
   - type: web
     name: website-quality-check
     runtime: docker
     repo: https://github.com/SwalehJamshaid/Website-Quality-Check
-    branch: main
     plan: free
     region: oregon
     dockerfilePath: Dockerfile
@@ -17,12 +16,11 @@ services:
       - key: SECRET_KEY
         generateValue: true
 
-  # Celery Worker
+  # Celery Worker Service
   - type: worker
     name: website-quality-check-worker
     runtime: docker
     repo: https://github.com/SwalehJamshaid/Website-Quality-Check
-    branch: main
     plan: free
     dockerfilePath: Dockerfile
     dockerCommand: celery -A app.celery_app worker --loglevel=info
