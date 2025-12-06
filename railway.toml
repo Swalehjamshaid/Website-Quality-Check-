@@ -1,0 +1,21 @@
+# railway.toml
+[build]
+# Use Nixpacks (default) or "docker" if you have a Dockerfile
+builder = "nixpacks"
+
+# Optional: only needed if auto-detection fails
+buildCommand = "npm install && npm run build"   # Node.js / Next.js / Remix / etc.
+# buildCommand = "pip install -r requirements.txt"  # Python example
+# buildCommand = "cargo build --release"            # Rust example
+
+[deploy]
+startCommand = "npm start"                     # Most common for Node.js
+# startCommand = "gunicorn myproject.wsgi"     # Django
+# startCommand = "uvicorn main:app --host 0.0.0.0 --port $PORT"  # FastAPI
+# startCommand = "target/release/myapp"        # Rust binary
+
+healthcheckPath = "/"
+healthcheckTimeout = 60
+
+# Optional: for monorepos only
+# rootDirectory = "./backend"
