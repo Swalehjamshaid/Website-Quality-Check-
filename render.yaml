@@ -6,9 +6,8 @@ services:
     region: oregon
     plan: free
 
-    # Repo & branch
+    # Repo (branch will be auto-detected)
     repo: https://github.com/Swalehjamshaid/Website-Quality-Check.git
-    branch: main
 
     # Build from your Dockerfile at the repo root
     dockerfilePath: Dockerfile
