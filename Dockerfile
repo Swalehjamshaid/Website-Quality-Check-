@@ -3,7 +3,7 @@
 # ========================================================
 FROM docker.io/library/node:20-alpine AS deps
 WORKDIR /app
-# The 'COPY package*.json ./' step assumes these files exist in your repo root.
+# Assumes package.json exists in your repo root.
 COPY package*.json ./
 # FIX 1: Use 'npm install' instead of 'npm ci' to bypass the missing package-lock.json error.
 RUN npm install --only=production --legacy-peer-deps
@@ -12,19 +12,22 @@ RUN npm install --only=production --legacy-peer-deps
 # 2. STAGE: Python Build (Installs Python dependencies)
 # ========================================================
 FROM python:3.11-slim AS build
-# FIX 2: Corrected list of system dependencies required for WeasyPrint 
-# and other common libraries like Matplotlib on Debian/slim.
-RUN apt-get update && apt-get install -y \
-    # WeasyPrint Core Dependencies
+
+# FIX 2: Corrected and comprehensive list of system dependencies required for WeasyPrint 
+# and other libraries on the Debian/slim base image.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # WeasyPrint/Pango/Harfbuzz build dependencies
     libpango-1.0-0 \
-    libharfbuzz-icu0 \
+    libpangoft2-1.0-0 \
+    libharfbuzz0b \
+    libharfbuzz-subset0 \
     libxml2-dev \
     libxslt1-dev \
     # General build dependencies
     build-essential \
     libssl-dev \
     libffi-dev \
-    # Image processing/Matplotlib dependencies
+    # Image processing dependencies (for Pillow/Matplotlib)
     libjpeg-dev \
     zlib1g-dev \
     # Clean up APT cache to keep image small
@@ -42,10 +45,11 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # Final runtime dependencies (without the -dev headers)
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     # WeasyPrint/Pango/Harfbuzz runtime libs
     libpango-1.0-0 \
-    libharfbuzz-icu0 \
+    libpangoft2-1.0-0 \
+    libharfbuzz0b \
     libxml2 \
     libxslt1.1 \
     # Other common runtime libs
@@ -59,14 +63,14 @@ COPY --from=build /usr/local/lib/python3.11/site-packages /usr/local/lib/python3
 # Copy entry point scripts/executables
 COPY --from=build /usr/local/bin/ /usr/local/bin/
 
-# Copy Node.js built files (static assets, etc.)
+# Copy Node.js built files (static assets, etc. - required if frontend assets exist)
 COPY --from=deps /app/node_modules /app/node_modules
 
 # Copy application code (including Procfile, app.py, templates, etc.)
 COPY . .
 
-# Set environment variable for Flask (optional, but good practice)
+# Set environment variable for Flask
 ENV FLASK_APP=app
 
-# Default command (will be overridden by Procfile on Railway)
+# Default command (overridden by Procfile on Railway)
 CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:5000"]
