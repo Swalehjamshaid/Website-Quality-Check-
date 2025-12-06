@@ -1,14 +1,21 @@
-Flask==2.3.3
-Flask-SQLAlchemy==3.1.1
-Flask-Login==0.6.3
-Flask-Bcrypt==1.0.1
-requests==2.31.0
-beautifulsoup4==4.12.3
-WeasyPrint==61.2
-matplotlib==3.8.2
-celery==5.3.6
-redis==5.0.1
-gunicorn==21.2.0
-psycopg2-binary==2.9.9
-whitenoise==6.7.0
-eventlet==0.36.1
+# Python Web Framework
+Flask
+Flask-SQLAlchemy
+Flask-Login
+Flask-Bcrypt
+
+# Web Server (Required for production on Railway)
+gunicorn
+
+# Database driver (Required for PostgreSQL)
+psycopg2-binary
+
+# Celery and Broker
+celery
+redis
+
+# Auditing Dependencies
+requests
+beautifulsoup4
+weasyprint
+matplotlib
