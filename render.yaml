@@ -1,32 +1,33 @@
-# render.yaml – Minimal & Schema-Valid (Dec 2025)
+
+# render.yaml — Minimal & Schema-Valid (Dec 2025)
 services:
   - type: web
-    name: rest-express-azay  # Your service name (update if needed)
-    env: python  # Enables Python runtime (auto-detects version from runtime.txt)
-    plan: free  # Free tier; upgrade to starter/standard for more resources
-    region: oregon  # Optional: Low-latency US West
+    name: <YOUR_SERVICE_NAME>                # e.g., website-quality-check
+    runtime: python                          # Render auto-detects from requirements.txt
+    region: oregon                           # or keep default
 
-    # Repo & Branch
-    repo: https://github.com/SwalehJamshaid/Website-Quality-Check
-    branch: main  # Confirm this branch has app.py & requirements.txt
+    # Link to your repo and the EXACT branch name
+    repo: <YOUR_GITHUB_REPO_URL>             # e.g., https://github.com/your-org/your-repo
+    branch: <YOUR_BRANCH>                    # e.g., main OR master (must exist!)
 
-    # Build & Start (Critical for Flask)
-    buildCommand: pip install -r requirements.txt  # Installs Flask, gunicorn, etc.
-    startCommand: gunicorn app:app  # Runs your app.py (with app = Flask(__name__))
+    # Build & Start (Flask example)
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 120
 
-    # Health Check
+    # Health Check (make sure your Flask app returns 200 on this path)
     healthCheckPath: /
+    healthCheck:
+      path: /
+      intervalSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
 
-    # Scaling & Auto-Deploy
     autoDeploy: true
-    numInstances: 1  # Free tier max
+    plan: free                                # change to starter or above for more resources
 
-    # Env Vars (Replace placeholders with real values)
     envVars:
-      - key: DATABASE_URL
-        value: postgresql://user:pass@host:5432/dbname  # Your actual DB connection string
       - key: PYTHONUNBUFFERED
-        value: "1"  # Better logging
-      # Uncomment/add secrets as needed:
-      # - key: SECRET_KEY
-      #   value: your-flask-secret-key-here
+        value: "1"
+      # Example: If you need a DB URL, define it here or via Render dashboard
+      # - key: DATABASE_URL
+      #   value: "postgres://..."
