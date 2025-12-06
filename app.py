@@ -32,7 +32,7 @@ urllib3.disable_warnings(InsecureRequestWarning)
 db = SQLAlchemy()
 bcrypt = Bcrypt()
 login_manager = LoginManager()
-celery_app = Celery(__name__) # FIX: Non-breaking space removed here.
+celery_app = Celery(__name__)
 
 # Assumed Model Definitions (defined here for completeness)
 class User(UserMixin, db.Model):
@@ -103,27 +103,27 @@ class Audit(db.Model):
 # APPLICATION FACTORY PATTERN
 # ========================================================
 def create_app():
-    app = Flask(__name__)
+    app = Flask(__name__) # Cleaned line 106
 
-    # --- CONFIGURATION ---
-    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', '37metrics-secret-2025')
-    
-    # CRITICAL: Synchronized with Railway PostgreSQL DATABASE_URL
-    database_url = os.getenv('DATABASE_URL', 'sqlite:///temp.db')
-    if database_url.startswith('postgres://'):
-        database_url = database_url.replace('postgres://', 'postgresql://', 1)
-    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    # --- CONFIGURATION ---
+    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', '37metrics-secret-2025')
+    
+    # CRITICAL: Synchronized with Railway PostgreSQL DATABASE_URL
+    database_url = os.getenv('DATABASE_URL', 'sqlite:///temp.db')
+    if database_url.startswith('postgres://'):
+        database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-    # Celery config (Synchronized with Railway Redis service)
-    redis_url = os.getenv('CELERY_BROKER_URL') or os.getenv('REDIS_URL') or 'redis://localhost:6379/0'
-    app.config['CELERY_BROKER_URL'] = redis_url
-    app.config['CELERY_RESULT_BACKEND'] = redis_url
+    # Celery config (Synchronized with Railway Redis service)
+    redis_url = os.getenv('CELERY_BROKER_URL') or os.getenv('REDIS_URL') or 'redis://localhost:6379/0'
+    app.config['CELERY_BROKER_URL'] = redis_url
+    app.config['CELERY_RESULT_BACKEND'] = redis_url
 
-    app.config['CELERY_ACCEPT_CONTENT'] = ['json']
-    app.config['CELERY_TASK_SERIALIZER'] = 'json'
-    app.config['CELERY_RESULT_SERIALIZER'] = 'json'
-    app.config['CELERY_TIMEZONE'] = 'UTC' 
+    app.config['CELERY_ACCEPT_CONTENT'] = ['json']
+    app.config['CELERY_TASK_SERIALIZER'] = 'json'
+    app.config['CELERY_RESULT_SERIALIZER'] = 'json'
+    app.config['CELERY_TIMEZONE'] = 'UTC' 
 
     # Celery Beat Schedule (Used by the 'scheduler' Procfile process)
     app.config['CELERY_BEAT_SCHEDULE'] = {
@@ -137,46 +137,46 @@ def create_app():
             'schedule': crontab(minute='*'),
         },
     }
-    
-    # --- EXTENSION INITIALIZATION ---
-    db.init_app(app)
-    bcrypt.init_app(app)
-    login_manager.init_app(app)
-    login_manager.login_view = 'login'
-    login_manager.login_message_category = 'info'
-    
-    # --- CELERY CONFIGURATION ---
-    celery_app.conf.update(app.config)
-    
-    # Celery Context Wrapper (CRITICAL for DB access in tasks)
-    class ContextTask(celery_app.Task):
-        def __call__(self, *args, **kwargs):
-            with app.app_context():
-                return self.run(*args, **kwargs)
-    celery_app.Task = ContextTask
+    
+    # --- EXTENSION INITIALIZATION ---
+    db.init_app(app)
+    bcrypt.init_app(app)
+    login_manager.init_app(app)
+    login_manager.login_view = 'login'
+    login_manager.login_message_category = 'info'
+    
+    # --- CELERY CONFIGURATION ---
+    celery_app.conf.update(app.config)
+    
+    # Celery Context Wrapper (CRITICAL for DB access in tasks)
+    class ContextTask(celery_app.Task):
+        def __call__(self, *args, **kwargs):
+            with app.app_context():
+                return self.run(*args, **kwargs)
+    celery_app.Task = ContextTask
 
-    # --- USER LOADER ---
-    @login_manager.user_loader
-    def load_user(user_id):
-        return db.session.get(User, int(user_id))
-        
-    # --- DATABASE INITIALIZATION + ADMIN USER ---
-    with app.app_context():
-        db.create_all()
-        # Initialize admin user (using ENV var for security)
-        admin_password = os.getenv('ADMIN_PASSWORD')
-        if not User.query.filter_by(email='roy.jamshaid@gmail.com').first() and admin_password:
-            admin = User(
-                name="Roy Jamshaid",
-                email="roy.jamshaid@gmail.com",
-                password=bcrypt.generate_password_hash(admin_password).decode('utf-8'), 
-                is_admin=True
-            )
-            db.session.add(admin)
-            db.session.commit()
-    
-    # ... (Remaining routes omitted for brevity but retained) ...
-    return app
+    # --- USER LOADER ---
+    @login_manager.user_loader
+    def load_user(user_id):
+        return db.session.get(User, int(user_id))
+        
+    # --- DATABASE INITIALIZATION + ADMIN USER ---
+    with app.app_context():
+        db.create_all()
+        # Initialize admin user (using ENV var for security)
+        admin_password = os.getenv('ADMIN_PASSWORD')
+        if not User.query.filter_by(email='roy.jamshaid@gmail.com').first() and admin_password:
+            admin = User(
+                name="Roy Jamshaid",
+                email="roy.jamshaid@gmail.com",
+                password=bcrypt.generate_password_hash(admin_password).decode('utf-8'), 
+                is_admin=True
+            )
+            db.session.add(admin)
+            db.session.commit()
+    
+    # ... (Routes code omitted for brevity) ...
+    return app
 
 # ========================================================
 # CELERY TASKS
@@ -264,4 +264,4 @@ def send_scheduled_reports():
 app = create_app()
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.getenv('PORT', 5000)))
+    app.run(host='0.0.0.0', port=int(os.getenv('PORT', 5000)))
