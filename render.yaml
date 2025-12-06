@@ -1,34 +1,32 @@
-# render.yaml – Fixed for Render Blueprint Schema (Dec 2025)
-blueprints:
-  - name: Website-Quality-Check  # Matches your service name
-    services:
-      - type: web
-        name: rest-express-azay  # Keep or update to match your repo
-        env: python  # This enables Python runtime (no separate pythonVersion)
-        plan: free  # Or "starter"/"standard" if upgrading
-        region: oregon  # Optional, recommended for low latency
+# render.yaml – Minimal & Schema-Valid (Dec 2025)
+services:
+  - type: web
+    name: rest-express-azay  # Your service name (update if needed)
+    env: python  # Enables Python runtime (auto-detects version from runtime.txt)
+    plan: free  # Free tier; upgrade to starter/standard for more resources
+    region: oregon  # Optional: Low-latency US West
 
-        # Repository settings
-        repo: https://github.com/SwalehJamshaid/Website-Quality-Check
-        branch: main  # Ensure this branch has your code
+    # Repo & Branch
+    repo: https://github.com/SwalehJamshaid/Website-Quality-Check
+    branch: main  # Confirm this branch has app.py & requirements.txt
 
-        # Build & Run commands (essential for Python/Flask)
-        buildCommand: pip install -r requirements.txt  # Installs deps like Flask, gunicorn
-        startCommand: gunicorn app:app  # Assumes app.py with app = Flask(__name__)
+    # Build & Start (Critical for Flask)
+    buildCommand: pip install -r requirements.txt  # Installs Flask, gunicorn, etc.
+    startCommand: gunicorn app:app  # Runs your app.py (with app = Flask(__name__))
 
-        # Health check (Render pings this path)
-        healthCheckPath: /
+    # Health Check
+    healthCheckPath: /
 
-        # Auto-deploy and scaling (free tier limits to 1 instance)
-        autoDeploy: true
-        numInstances: 1
+    # Scaling & Auto-Deploy
+    autoDeploy: true
+    numInstances: 1  # Free tier max
 
-        # Environment variables (add real values; sync with dashboard)
-        envVars:
-          - key: DATABASE_URL
-            value: postgresql://user:pass@host:5432/dbname  # Replace with your actual DB URL
-          - key: PYTHONUNBUFFERED
-            value: "1"  # Improves log visibility
-          # Add more as needed, e.g.:
-          # - key: SECRET_KEY
-          #   value: your-app-secret
+    # Env Vars (Replace placeholders with real values)
+    envVars:
+      - key: DATABASE_URL
+        value: postgresql://user:pass@host:5432/dbname  # Your actual DB connection string
+      - key: PYTHONUNBUFFERED
+        value: "1"  # Better logging
+      # Uncomment/add secrets as needed:
+      # - key: SECRET_KEY
+      #   value: your-flask-secret-key-here
