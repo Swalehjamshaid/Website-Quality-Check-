@@ -2,6 +2,7 @@ import os
 import time
 import io
 import base64
+import ssl 
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash, send_file
 from flask_sqlalchemy import SQLAlchemy
@@ -14,39 +15,86 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from celery import Celery
+from urllib3.exceptions import InsecureRequestWarning 
 
 # ========================================================
-# FLASK APP SETUP + RENDER FIXES
+# GLOBALS & INITIALIZATIONS
 # ========================================================
-app = Flask(__name__)
+db = SQLAlchemy()
+bcrypt = Bcrypt()
+login_manager = LoginManager()
+# Use the module name '__name__' so Celery can find tasks correctly
+celery_app = Celery(__name__) 
 
-# Critical Render Fixes
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', '37metrics-secret-2025')
-
-# Fix PostgreSQL URL (Render uses postgres://, SQLAlchemy needs postgresql://)
-database_url = os.getenv('DATABASE_URL')
-if database_url and database_url.startswith('postgres://'):
-    database_url = database_url.replace('postgres://', 'postgresql://', 1)
-app.config['SQLALCHEMY_DATABASE_URI'] = database_url or 'sqlite:///temp.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-# Celery config
-app.config['CELERY_BROKER_URL'] = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')
-app.config['CELERY_RESULT_BACKEND'] = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')
-
-# Initialize Celery
-celery_app = Celery(app.name, broker=app.config['CELERY_BROKER_URL'])
-celery_app.conf.update(app.config)
-
-# Initialize extensions
-db = SQLAlchemy(app)
-bcrypt = Bcrypt(app)
-login_manager = LoginManager(app)
-login_manager.login_view = 'login'
-login_manager.login_message_category = 'info'
 
 # ========================================================
-# MODELS (All 37 Metrics Preserved)
+# APPLICATION FACTORY PATTERN
+# ========================================================
+def create_app():
+    app = Flask(__name__)
+
+    # --- CONFIGURATION ---
+    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', '37metrics-secret-2025')
+    
+    # Fix PostgreSQL URL for Railway/Render (using the same logic)
+    database_url = os.getenv('DATABASE_URL')
+    if database_url and database_url.startswith('postgres://'):
+        database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url or 'sqlite:///temp.db'
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+    # Celery config - **CRITICAL FOR RAILWAY**
+    # Railway passes the Redis connection string as REDIS_URL or CELERY_BROKER_URL
+    redis_url = os.getenv('CELERY_BROKER_URL') or os.getenv('REDIS_URL')
+    app.config['CELERY_BROKER_URL'] = redis_url or 'redis://localhost:6379/0'
+    app.config['CELERY_RESULT_BACKEND'] = app.config['CELERY_BROKER_URL']
+
+    app.config['CELERY_ACCEPT_CONTENT'] = ['json']
+    app.config['CELERY_TASK_SERIALIZER'] = 'json'
+    app.config['CELERY_RESULT_SERIALIZER'] = 'json'
+    app.config['CELERY_TIMEZONE'] = 'UTC' # Use UTC for scheduled tasks (best practice)
+    
+    # --- EXTENSION INITIALIZATION ---
+    db.init_app(app)
+    bcrypt.init_app(app)
+    login_manager.init_app(app)
+    login_manager.login_view = 'login'
+    login_manager.login_message_category = 'info'
+    
+    # --- CELERY CONFIGURATION ---
+    # Update Celery config from Flask app config
+    celery_app.conf.update(app.config)
+    
+    # Celery Context Wrapper
+    class ContextTask(celery_app.Task):
+        def __call__(self, *args, **kwargs):
+            with app.app_context():
+                return self.run(*args, **kwargs)
+    celery_app.Task = ContextTask
+
+    # --- USER LOADER ---
+    @login_manager.user_loader
+    def load_user(user_id):
+        return db.session.get(User, int(user_id))
+        
+    # --- DATABASE INITIALIZATION + ADMIN USER ---
+    with app.app_context():
+        db.create_all()
+        # Initialize admin user if missing
+        if not User.query.filter_by(email='roy.jamshaid@gmail.com').first():
+            admin = User(
+                name="Roy Jamshaid",
+                email="roy.jamshaid@gmail.com",
+                password=bcrypt.generate_password_hash("Jamshaid,1981").decode('utf-8'),
+                is_admin=True
+            )
+            db.session.add(admin)
+            db.session.commit()
+    
+    return app
+
+# ========================================================
+# MODELS (Preserved)
 # ========================================================
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -65,6 +113,7 @@ class Website(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
 
 class Audit(db.Model):
+    # ALL 37 Metrics Preserved
     id = db.Column(db.Integer, primary_key=True)
     website_id = db.Column(db.Integer, db.ForeignKey('website.id'), nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
@@ -106,102 +155,93 @@ class Audit(db.Model):
     cookie_compliance = db.Column(db.Boolean)
     core_web_vitals_pass = db.Column(db.Boolean)
 
-@login_manager.user_loader
-def load_user(user_id):
-    return User.query.get(int(user_id))
+# ========================================================
+# CELERY TASKS
+# ========================================================
+requests_session = requests.Session()
 
-# ========================================================
-# DATABASE INITIALIZATION + ADMIN USER
-# ========================================================
-with app.app_context():
-    db.create_all()
-    if not User.query.filter_by(email='roy.jamshaid@gmail.com').first():
-        admin = User(
-            name="Roy Jamshaid",
-            email="roy.jamshaid@gmail.com",
-            password=bcrypt.generate_password_hash("Jamshaid,1981").decode('utf-8'),
-            is_admin=True
-        )
-        db.session.add(admin)
-        db.session.commit()
-
-# ========================================================
-# CELERY TASKS (37 Metrics Fully Calculated)
-# ========================================================
 @celery_app.task(bind=True)
 def audit_website(self, wid):
-    with app.app_context():
-        site = Website.query.get(wid)
-        if not site:
-            return
+    site = db.session.get(Website, wid)
+    if not site:
+        return
 
-        try:
-            headers = {'User-Agent': '37MetricsBot/2025'}
-            start = time.time()
-            r = requests.get(site.url, timeout=30, headers=headers, allow_redirects=True, verify=False)
-            load_time = time.time() - start
-            soup = BeautifulSoup(r.text, 'html.parser')
-            imgs = soup.find_all('img')
-            links = soup.find_all('a', href=True)
+    try:
+        headers = {'User-Agent': '37MetricsBot/2025'}
+        start = time.time()
+        
+        r = requests_session.get(site.url, timeout=30, headers=headers, allow_redirects=True, verify=True) 
+        r.raise_for_status() 
 
-            audit = Audit(
-                website_id=site.id,
-                load_time=round(load_time, 2),
-                page_size_kb=round(len(r.content) / 1024, 1),
-                status_code=r.status_code,
-                lcp=round(load_time * 2.5, 2),
-                fid=50,
-                cls=0.05,
-                fcp=round(load_time * 1.2, 2),
-                tbt=250,
-                seo_score=95 if soup.title and soup.find('meta', name='description') else 60,
-                performance_score=92 if load_time < 3 else 70,
-                accessibility_score=94,
-                best_practices_score=90,
-                mobile_responsive=bool(soup.find('meta', {'name': 'viewport'})),
-                has_https=site.url.startswith('https://'),
-                robots_txt=True,
-                sitemap_xml=True,
-                canonical_tag=bool(soup.find('link', rel='canonical')),
-                meta_description=bool(soup.find('meta', name='description')),
-                title_tag=bool(soup.title),
-                h1_tag=bool(soup.find('h1')),
-                alt_tags=round((len([i for i in imgs if i.get('alt') and i['alt'].strip()]) / max(1, len(imgs))) * 100, 1),
-                broken_links=0,
-                internal_links=len([l for l in links if l['href'].startswith('/') or site.url in l['href']]),
-                external_links=len([l for l in links if not l['href'].startswith('/') and site.url not in l['href']]),
-                compression_enabled='gzip' in r.headers.get('Content-Encoding', ''),
-                cache_policy=bool(r.headers.get('Cache-Control')),
-                minified_css=True,
-                minified_js=True,
-                unused_css=22.4,
-                unused_js=38.1,
-                render_blocking=12,
-                third_party_requests=len([src for src in soup.find_all(src=True) if 'cdn' in src['src'] or 'google' in src['src']]),
-                server_response_time=round(load_time * 0.4, 2),
-                ssl_valid=site.url.startswith('https://'),
-                security_headers=len([h for h in r.headers if h.lower() in ['strict-transport-security', 'x-frame-options', 'x-xss-protection']]),
-                cookie_compliance=True,
-                core_web_vitals_pass=(load_time < 2.5)
-            )
-            db.session.add(audit)
-            db.session.commit()
+        load_time = time.time() - start
+        soup = BeautifulSoup(r.text, 'html.parser')
+        imgs = soup.find_all('img')
+        links = soup.find_all('a', href=True)
 
-        except Exception as e:
-            print(f"Audit failed for {site.url}: {e}")
-            audit = Audit(website_id=site.id, status_code=0, load_time=0.0)
-            db.session.add(audit)
-            db.session.commit()
+        audit = Audit(
+            website_id=site.id,
+            load_time=round(load_time, 2),
+            page_size_kb=round(len(r.content) / 1024, 1),
+            status_code=r.status_code,
+            lcp=round(load_time * 2.5, 2),
+            fid=50,
+            cls=0.05,
+            fcp=round(load_time * 1.2, 2),
+            tbt=250,
+            seo_score=95 if soup.title and soup.find('meta', name='description') else 60,
+            performance_score=92 if load_time < 3 else 70,
+            accessibility_score=94,
+            best_practices_score=90,
+            mobile_responsive=bool(soup.find('meta', {'name': 'viewport'})),
+            has_https=site.url.startswith('https://'),
+            robots_txt=True,
+            sitemap_xml=True,
+            canonical_tag=bool(soup.find('link', rel='canonical')),
+            meta_description=bool(soup.find('meta', name='description')),
+            title_tag=bool(soup.title),
+            h1_tag=bool(soup.find('h1')),
+            alt_tags=round((len([i for i in imgs if i.get('alt') and i['alt'].strip()]) / max(1, len(imgs))) * 100, 1),
+            broken_links=0,
+            internal_links=len([l for l in links if l['href'].startswith('/') or site.url in l['href']]),
+            external_links=len([l for l in links if not l['href'].startswith('/') and site.url not in l['href']]),
+            compression_enabled='gzip' in r.headers.get('Content-Encoding', ''),
+            cache_policy=bool(r.headers.get('Cache-Control')),
+            minified_css=True,
+            minified_js=True,
+            unused_css=22.4,
+            unused_js=38.1,
+            render_blocking=12,
+            third_party_requests=len([src for src in soup.find_all(src=True) if 'cdn' in src['src'] or 'google' in src['src']]),
+            server_response_time=round(load_time * 0.4, 2),
+            ssl_valid=site.url.startswith('https://'),
+            security_headers=len([h for h in r.headers if h.lower() in ['strict-transport-security', 'x-frame-options', 'x-xss-protection']]),
+            cookie_compliance=True,
+            core_web_vitals_pass=(load_time < 2.5)
+        )
+        db.session.add(audit)
+        db.session.commit()
+
+    except requests.exceptions.RequestException as e:
+        print(f"Audit failed for {site.url} due to connection/request error: {e}")
+        audit = Audit(website_id=site.id, status_code=r.status_code if 'r' in locals() else 0, load_time=0.0)
+        db.session.add(audit)
+        db.session.commit()
+    except Exception as e:
+        print(f"Audit failed for {site.url} due to unknown error: {e}")
+        audit = Audit(website_id=site.id, status_code=0, load_time=0.0)
+        db.session.add(audit)
+        db.session.commit()
 
 @celery_app.task
 def daily_audit_all():
-    with app.app_context():
-        for website in Website.query.all():
-            audit_website.delay(website.id)
+    for website in Website.query.all():
+        audit_website.delay(website.id)
 
 # ========================================================
-# ROUTES
+# ROUTES 
 # ========================================================
+app = create_app()
+
 @app.route('/')
 def index():
     if current_user.is_authenticated:
@@ -216,7 +256,7 @@ def login():
             login_user(user)
             return redirect(url_for('dashboard'))
         flash('Login failed. Check email and password.', 'danger')
-    return render_template('login.html')  # You need this template
+    return render_template('login.html') 
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -253,14 +293,22 @@ def add_website():
 @app.route('/site/<int:wid>')
 @login_required
 def site_detail(wid):
-    site = Website.query.get_or_404(wid)
-    audits = Audit.query.filter_by(website_id=wid).order_by(Audit.timestamp.desc()).limit(10)
+    site = db.session.get(Website, wid)
+    if site is None or site.user_id != current_user.id: 
+        flash('Access denied or website not found.', 'danger')
+        return redirect(url_for('dashboard'))
+        
+    audits = Audit.query.filter_by(website_id=wid).order_by(Audit.timestamp.desc()).limit(10).all()
     return render_template('site_detail.html', site=site, audits=audits)
 
 @app.route('/report/<int:wid>')
 @login_required
 def report(wid):
-    site = Website.query.get_or_404(wid)
+    site = db.session.get(Website, wid)
+    if site is None or site.user_id != current_user.id:
+        flash('Access denied or website not found.', 'danger')
+        return redirect(url_for('dashboard'))
+
     latest = Audit.query.filter_by(website_id=wid).order_by(Audit.timestamp.desc()).first()
     if not latest:
         flash('No audit data yet.', 'warning')
@@ -269,10 +317,16 @@ def report(wid):
     # Generate PDF with WeasyPrint
     html = render_template('report.html', site=site, audit=latest)
     pdf = HTML(string=html).write_pdf()
-    return send_file(io.BytesIO(pdf), as_attachment=True, download_name=f"37Metrics_Report_{site.name}.pdf", mimetype='application/pdf')
+    return send_file(io.BytesIO(pdf), as_attachment=True, download_name=f"37Metrics_Report_{site.name or site.id}.pdf", mimetype='application/pdf')
 
 # ========================================================
-# RUN APP (Render uses gunicorn)
+# RAILWAY/GUNICORN ENTRY POINT
 # ========================================================
+
+# The 'app' object is created globally when this module is imported by Gunicorn/uWSGI.
+# This ensures that the application factory pattern works correctly for the web process.
+
 if __name__ == '__main__':
+    # This block is only run when executing 'python app.py' directly (e.g., local development).
+    # In a production environment like Railway, Gunicorn/uWSGI handles the process startup.
     app.run(host='0.0.0.0', port=int(os.getenv('PORT', 5000)))
