@@ -1,23 +1,20 @@
-# Use a stable Python version
 FROM python:3.11-slim
 
-# Install system libraries needed for Pillow, lxml, WeasyPrint
-RUN apt-get update && apt-get install -y \
-    libjpeg-dev zlib1g-dev libfreetype6-dev libharfbuzz-dev libfribidi-dev \
-    libcairo2 libcairo2-dev libpango-1.0-0 libgdk-pixbuf2.0-0 libffi-dev \
-    build-essential \
- && rm -rf /var/lib/apt/lists/*
+# System deps for WeasyPrint, Pillow, Matplotlib
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libjpeg62-turbo-dev zlib1g-dev libfreetype6-dev \
+    libcairo2 libpango-1.0-0 libpangocairo-1.0-0 \
+    libgdk-pixbuf2.0-0 build-essential \
+    && rm -rf /var/lib/apt/lists/*
 
-# Set working directory
 WORKDIR /app
 
-# Copy requirements and install Python packages
 COPY requirements.txt .
-RUN pip install --upgrade pip
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
 
-# Copy app code
 COPY . .
 
-# Start the app
-CMD ["gunicorn", "app:app"]
+# Expose port (Render uses $PORT)
+EXPOSE $PORT
+
+CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:$PORT"]
