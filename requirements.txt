@@ -1,20 +1,11 @@
-# Python Web Framework
 Flask
 Flask-SQLAlchemy
 Flask-Login
 Flask-Bcrypt
-
-# Web Server (Required for production on Railway)
 gunicorn
-
-# Database driver (Required for PostgreSQL)
 psycopg2-binary
-
-# Celery and Broker
 celery
 redis
-
-# Auditing Dependencies
 requests
 beautifulsoup4
 weasyprint
