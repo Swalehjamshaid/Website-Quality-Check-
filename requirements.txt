@@ -8,5 +8,4 @@ redis==5.0.1
 requests==2.31.0
 beautifulsoup4==4.12.2
 weasyprint==62.1
-matplotlib==3.8.2
 psycopg2-binary==2.9.9
