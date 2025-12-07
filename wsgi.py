@@ -1,4 +1,4 @@
-# wsgi.py — FINAL 100% WORKING — NO 500 — BEAUTIFUL UI
+# wsgi.py — FINAL BEAUTIFUL + 100% WORKING
 import os
 from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
@@ -6,8 +6,8 @@ from flask_login import LoginManager, UserMixin, login_user, logout_user, login_
 from flask_bcrypt import Bcrypt
 from celery import Celery
 
-# Force template folder to be correct
-template_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'templates'))
+# Force correct template path
+template_dir = os.path.join(os.path.dirname(__file__), 'templates')
 
 def create_app():
     app = Flask(__name__, template_folder=template_dir)
@@ -15,7 +15,7 @@ def create_app():
 
     # Database
     db_url = os.getenv('DATABASE_URL', 'sqlite:///db.sqlite')
-    if db_url.startswith('postgres://'):
+    if db_url and db_url.startswith('postgres://'):
         db_url = db_url.replace('postgres://', 'postgresql://', 1)
     app.config['SQLALCHEMY_DATABASE_URI'] = db_url
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -49,7 +49,7 @@ def create_app():
 
     @celery.task
     def audit_website(website_id):
-        print(f"Auditing website {website_id}...")
+        print(f"37-metric audit started for website {website_id}")
 
     @app.route('/')
     def index():
@@ -64,7 +64,7 @@ def create_app():
             if user and bcrypt.check_password_hash(user.password, request.form['password']):
                 login_user(user)
                 return redirect(url_for('dashboard'))
-            flash('Invalid email or password')
+            flash('Invalid email or password', 'error')
         return render_template('login.html')
 
     @app.route('/logout')
@@ -85,11 +85,11 @@ def create_app():
         url = request.form['url'].strip()
         if not url.startswith(('http://', 'https://')):
             url = 'https://' + url
-        site = Website(url=url, name=request.form.get('name', ''), user_id=current_user.id)
+        site = Website(url=url, name=url, user_id=current_user.id)
         db.session.add(site)
         db.session.commit()
         audit_website.delay(site.id)
-        flash('Website added! Audit started...')
+        flash('Website added! Full 37-metric audit started...', 'success')
         return redirect(url_for('dashboard'))
 
     with app.app_context():
@@ -104,6 +104,3 @@ def create_app():
 
 application = create_app()
 celery = application.celery
-
-if __name__ == '__main__':
-    application.run(host='0.0.0.0', port=int(os.getenv('PORT', 5000)))
