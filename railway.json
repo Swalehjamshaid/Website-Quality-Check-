@@ -4,16 +4,17 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "gunicorn app:application --bind 0.0.0.0:$PORT"
+    "startCommand": "gunicorn app:application --bind 0.0.0.0:$PORT",
+    "restartPolicy": "ON_FAILURE"
   },
   "services": [
     {
       "name": "web",
-      "startCommand": "gunicorn app:application --bind 0.0.0.0:$PORT --workers 1"
+      "startCommand": "gunicorn app:application --bind 0.0.0.0:$PORT --workers 1 --timeout 120"
     },
     {
       "name": "worker",
-      "startCommand": "celery -A app:celery worker --loglevel=info"
+      "startCommand": "celery -A app:celery worker --loglevel=info --concurrency=1"
     },
     {
       "name": "scheduler",
