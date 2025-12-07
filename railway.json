@@ -9,11 +9,11 @@
   "services": [
     {
       "name": "web",
-      "startCommand": "gunicorn app:application --bind 0.0.0.0:$PORT --workers 1 --timeout 120"
+      "startCommand": "gunicorn app:application --bind 0.0.0.0:$PORT --workers 1"
     },
     {
       "name": "worker",
-      "startCommand": "celery -A app:celery worker --loglevel=info --concurrency=1"
+      "startCommand": "celery -A app:celery worker --loglevel=info"
     },
     {
       "name": "scheduler",
