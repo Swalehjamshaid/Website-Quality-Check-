@@ -1,25 +1,25 @@
 {
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
-    "builder": "nixpacks"
+    "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "gunicorn wsgi:application",
-    "restartPolicyType": "ON_FAILURE",
+    "startCommand": "gunicorn app:application --bind 0.0.0.0:$PORT",
+    "restartPolicy": "ON_FAILURE",
     "restartPolicyMaxRetries": 10
   },
   "services": [
     {
       "name": "web",
-      "startCommand": "gunicorn wsgi:application --bind 0.0.0.0:$PORT"
+      "startCommand": "gunicorn app:application --bind 0.0.0.0:$PORT --workers 1 --timeout 120"
     },
     {
       "name": "worker",
-      "startCommand": "celery -A wsgi:celery worker --loglevel=info"
+      "startCommand": "celery -A app:celery worker --loglevel=info --concurrency=1"
     },
     {
-      "name": "beat",
-      "startCommand": "celery -A wsgi:celery beat --loglevel=info"
+      "name": "scheduler",
+      "startCommand": "celery -A app:celery beat --loglevel=info"
     }
   ]
 }
