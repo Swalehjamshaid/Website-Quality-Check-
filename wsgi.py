@@ -1,8 +1,5 @@
-# wsgi.py
-from app import create_app
-from app.tasks import celery
-
 application = create_app()
+celery = application.celery
 
-# Important: Initialize Celery with the app context
-celery.conf.update(application.config)
+if __name__ == '__main__':
+    application.run(host='0.0.0.0', port=int(os.getenv('PORT', 5000)))
