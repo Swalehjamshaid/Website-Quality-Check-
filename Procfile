@@ -1,4 +1,3 @@
-
-web: gunicorn wsgi:application --bind 0.0.0.0:$PORT
-worker: celery -A celery_worker.celery_app worker --loglevel=info
-scheduler: celery -A celery_worker.celery_app beat --loglevel=info
+web: gunicorn wsgi:application --bind 0.0.0.0:$PORT --workers 2
+worker: celery -A wsgi:celery worker --loglevel=info
+beat: celery -A wsgi:celery beat --loglevel=info
