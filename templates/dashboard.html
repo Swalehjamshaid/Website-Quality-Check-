@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="text-center py-16">
+    <h1 class="text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-700 mb-6">
+        Welcome to 37Metrics!
+    </h1>
+    <p class="text-2xl text-gray-700">Your professional website quality monitoring SaaS is LIVE</p>
+</div>
+
+<div class="bg-white/95 backdrop-blur rounded-3xl shadow-2xl p-12 max-w-4xl mx-auto border border-white/50">
+    <h2 class="text-4xl font-bold text-center text-indigo-700 mb-10">Add Website for Full Audit</h2>
+    <form method="POST" action="/add" class="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <input type="url" name="url" placeholder="https://example.com" required
+               class="px-8 py-6 text-xl border-2 border-gray-300 rounded-2xl focus:border-purple-500 focus:outline-none transition">
+        <input type="text" name="name" placeholder="Website name (optional)"
+               class="px-8 py-6 text-xl border-2 border-gray-300 rounded-2xl focus:border-purple-500 focus:outline-none transition">
+        <button type="submit" class="bg-gradient-to-r from-indigo-600 to-purple-700 text-white font-bold text-xl py-6 rounded-2xl hover:from-indigo-700 hover:to-purple-800 transition transform hover:scale-105">
+            Start Full 37-Metric Audit
+        </button>
+    </form>
+</div>
+
+<div class="text-center mt-20">
+    <p class="text-3xl font-bold text-green-600">CONGRATULATIONS ROY!</p>
+    <p class="text-xl text-gray-600 mt-4">Your dream SaaS is now LIVE and BEAUTIFUL</p>
+</div>
+{% endblock %}
