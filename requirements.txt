@@ -2,11 +2,8 @@ Flask==2.3.3
 Flask-SQLAlchemy
 Flask-Login
 Flask-Bcrypt
-Flask-Mail
-WeasyPrint
-APScheduler
 requests
 beautifulsoup4
-matplotlib
 gunicorn
 psycopg2-binary
+weasyprint
