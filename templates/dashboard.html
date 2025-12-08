@@ -1,27 +1,47 @@
-{% extends "base.html" %}
-{% block content %}
-<div class="text-center py-16">
-    <h1 class="text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-700 mb-6">
-        Welcome to 37Metrics!
-    </h1>
-    <p class="text-2xl text-gray-700">Your professional website quality monitoring SaaS is LIVE</p>
+<!DOCTYPE html>
+<html>
+<head>
+  <title>37Metrics Dashboard</title>
+  <style>
+    body {font-family: Arial; background: #f8f9ff; margin:0;}
+    .header {background: linear-gradient(90deg, #6e0af8, #a855f7); color:white; padding:20px; text-align:center;}
+    .card {max-width:900px; margin:30px auto; background:white; padding:30px; border-radius:15px; box-shadow:0 10px 30px rgba(0,0,0,0.1);}
+    input, button {padding:14px; margin:8px; font-size:16px; border-radius:8px; border:1px solid #ddd;}
+    button {background:#6e0af8; color:white; border:none; cursor:pointer;}
+    .success {background:#d4edda; color:#155724; padding:15px; border-radius:8px; margin:20px 0;}
+    .btn {background:#28a745; color:white; padding:8px 16px; text-decoration:none; border-radius:6px; font-size:14px;}
+  </style>
+</head>
+<body>
+<div class="header">
+  <h1>37Metrics</h1>
+  <p>Welcome, {{ user.name }} | <a href="/logout" style="color:white;">Logout</a></p>
 </div>
+<div class="card">
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}<div class="success">{{ messages[-1] }}</div>{% endif %}
+  {% endwith %}
 
-<div class="bg-white/95 backdrop-blur rounded-3xl shadow-2xl p-12 max-w-4xl mx-auto border border-white/50">
-    <h2 class="text-4xl font-bold text-center text-indigo-700 mb-10">Add Website for Full Audit</h2>
-    <form method="POST" action="/add" class="grid grid-cols-1 md:grid-cols-3 gap-8">
-        <input type="url" name="url" placeholder="https://example.com" required
-               class="px-8 py-6 text-xl border-2 border-gray-300 rounded-2xl focus:border-purple-500 focus:outline-none transition">
-        <input type="text" name="name" placeholder="Website name (optional)"
-               class="px-8 py-6 text-xl border-2 border-gray-300 rounded-2xl focus:border-purple-500 focus:outline-none transition">
-        <button type="submit" class="bg-gradient-to-r from-indigo-600 to-purple-700 text-white font-bold text-xl py-6 rounded-2xl hover:from-indigo-700 hover:to-purple-800 transition transform hover:scale-105">
-            Start Full 37-Metric Audit
-        </button>
-    </form>
-</div>
+  <h2>Add Website for Full Audit</h2>
+  <form method="post" action="/add">
+    <input name="url" placeholder="https://example.com" required style="width:360px;">
+    <input name="name" placeholder="Website name (optional)" style="width:260px;">
+    <button type="submit">Start Full 37-Metric Audit</button>
+  </form>
 
-<div class="text-center mt-20">
-    <p class="text-3xl font-bold text-green-600">CONGRATULATIONS ROY!</p>
-    <p class="text-xl text-gray-600 mt-4">Your dream SaaS is now LIVE and BEAUTIFUL</p>
+  <h2>Your Websites</h2>
+  {% if sites %}
+    <table width="100%">
+      {% for s in sites %}
+      <tr style="padding:10px 0; border-bottom:1px solid #eee;">
+        <td><strong>{{ s.name or s.url }}</strong></td>
+        <td align="right"><a href="/results/{{ s.id }}" class="btn">View Full Report</a></td>
+      </tr>
+      {% endfor %}
+    </table>
+  {% else %}
+    <p>No websites yet. Add one above!</p>
+  {% endif %}
 </div>
-{% endblock %}
+</body>
+</html>
