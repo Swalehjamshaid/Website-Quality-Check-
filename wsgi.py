@@ -1,9 +1,8 @@
-# wsgi.py — 37 METRICS PRO VERSION — Production-Ready for Railway with Celery
+# wsgi.py — FINAL 37 METRICS PRO VERSION — Optimized for Railway with Celery
 import os
 import json
 import requests
 import base64
-import logging
 from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
@@ -11,17 +10,15 @@ from flask_bcrypt import Bcrypt
 from datetime import datetime
 from urllib.parse import urlparse
 from bs4 import BeautifulSoup
-from celery import Celery
+from dotenv import load_dotenv
 
-# ==================== LOGGING ====================
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Load .env if present
+load_dotenv()
 
 # ==================== CORE SETUP ====================
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', '37metrics-pro-2025')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SESSION_COOKIE_SECURE'] = True  # secure cookie if using HTTPS
 
 # Database Configuration
 db_url = os.getenv('DATABASE_URL')
@@ -38,14 +35,13 @@ bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
-# Google PageSpeed API Key
-PAGESPEED_API_KEY = os.getenv('PAGESPEED_API_KEY') 
+PAGESPEED_API_KEY = os.getenv('PAGESPEED_API_KEY')
 
 # Logo setup
 try:
     with open("ff_logo.png", "rb") as f:
         LOGO = base64.b64encode(f.read()).decode()
-except FileNotFoundError:
+except:
     LOGO = ""
 
 # ==================== MODELS ====================
@@ -60,45 +56,43 @@ class Website(db.Model):
     url = db.Column(db.String(500), nullable=False)
     name = db.Column(db.String(200))
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    __table_args__ = (db.UniqueConstraint('user_id', 'url', name='user_website_uc'),)
 
 class Audit(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     website_id = db.Column(db.Integer, db.ForeignKey('website.id'))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
-    data = db.Column(db.Text)  # Stores all 37 metrics as JSON
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    data = db.Column(db.Text)
 
 @login_manager.user_loader
 def load_user(user_id):
     return db.session.get(User, int(user_id))
 
 # ==================== CELERY SETUP ====================
+from celery import Celery
 celery = Celery(app.name, broker=app.config['CELERY_BROKER_URL'], backend=app.config['CELERY_RESULT_BACKEND'])
-celery.conf.update(
-    task_serializer='json',
-    result_serializer='json',
-    accept_content=['json'],
-    timezone='UTC',
-    enable_utc=True,
-)
+celery.conf.update(app.config)
 
-@celery.task(bind=True, autoretry_for=(Exception,), retry_backoff=True)
+@celery.task(bind=True)
 def run_full_audit_task(self, website_id):
     with app.app_context():
         site = Website.query.get(website_id)
         if not site:
-            logger.error(f"Website ID {website_id} not found.")
+            print(f"Website ID {website_id} not found.")
             return
 
         url = site.url
-        result = {metric: 0 if metric in ['performance', 'accessibility', 'best_practices', 'seo', 'pwa', 'overall_score'] else "N/A" for metric in [
-            "performance", "accessibility", "best_practices", "seo", "pwa", "lcp", "cls", "fcp", "tbt", "tti", "speed_index",
-            "page_size_kb", "total_requests", "has_https", "server_response_time", "title_tag", "meta_description", "viewport_tag",
-            "robots_txt", "sitemap_xml", "canonical_tag", "hreflang_tags", "mobile_friendly", "structured_data", "open_graph_tags",
-            "twitter_cards", "favicon", "gzip_compression", "cache_headers", "image_optimized", "js_minified", "css_minified",
-            "unused_css", "unused_js", "render_blocking_resources", "third_party_js", "font_display_swap", "preload_key_requests",
-            "modern_image_formats", "lazy_loading", "no_vulnerable_js", "no_mixed_content", "valid_ssl", "grade", "overall_score"
-        ]}
+        result = {
+            "performance": 0, "accessibility": 0, "best_practices": 0, "seo": 0, "pwa": 0,
+            "lcp": "N/A", "cls": "N/A", "fcp": "N/A", "tbt": "N/A", "tti": "N/A", "speed_index": "N/A",
+            "page_size_kb": 0, "total_requests": 0, "has_https": False,
+            "server_response_time": "N/A", "title_tag": False, "meta_description": False, "viewport_tag": False,
+            "robots_txt": False, "sitemap_xml": False, "canonical_tag": False, "hreflang_tags": False, "mobile_friendly": False,
+            "structured_data": False, "open_graph_tags": False, "twitter_cards": False,
+            "favicon": False, "gzip_compression": False, "cache_headers": False, "image_optimized": False, "js_minified": False, "css_minified": False,
+            "unused_css": False, "unused_js": False, "render_blocking_resources": False, "third_party_js": False, "font_display_swap": False, "preload_key_requests": False,
+            "modern_image_formats": False, "lazy_loading": False, "no_vulnerable_js": True, "no_mixed_content": True, "valid_ssl": True,
+            "grade": "F", "overall_score": 0,
+        }
 
         try:
             headers = {'User-Agent': '37Metrics-Pro-Auditor v2.0 (+https://37metrics.live)'}
@@ -106,56 +100,53 @@ def run_full_audit_task(self, website_id):
             final_url = r.url
             soup = BeautifulSoup(r.text, 'html.parser')
 
-            # Basic metrics
             result.update({
                 "page_size_kb": round(len(r.content) / 1024, 1),
                 "server_response_time": f"{r.elapsed.total_seconds():.2f}s",
                 "has_https": final_url.startswith('https://'),
                 "title_tag": bool(soup.title and soup.title.string and len(soup.title.string.strip()) > 0),
                 "meta_description": bool(soup.find('meta', attrs={'name': 'description'})),
-                "robots_txt": requests.head(f"{urlparse(final_url).scheme}://{urlparse(final_url).netloc}/robots.txt", timeout=5).status_code == 200,
-                "sitemap_xml": requests.head(f"{urlparse(final_url).scheme}://{urlparse(final_url).netloc}/sitemap.xml", timeout=5).status_code == 200,
+                "robots_txt": requests.head(f"{urlparse(final_url).scheme}://{urlparse(final_url).netloc}/robots.txt", timeout=8).status_code == 200,
+                "sitemap_xml": requests.head(f"{urlparse(final_url).scheme}://{urlparse(final_url).netloc}/sitemap.xml", timeout=8).status_code == 200,
                 "gzip_compression": 'gzip' in r.headers.get('content-encoding', '').lower() or 'br' in r.headers.get('content-encoding', '').lower(),
             })
 
-            # Google PageSpeed Insights API
-            psi_params = {"url": final_url, "strategy": "desktop", "category": ["performance", "accessibility", "best-practices", "seo", "pwa"]}
             if PAGESPEED_API_KEY:
-                psi_params['key'] = PAGESPEED_API_KEY
-
-            psi_res = requests.get("https://www.googleapis.com/pagespeedonline/v5/runPagespeed", params=psi_params, timeout=60)
-            psi_res.raise_for_status()
-            psi = psi_res.json()
-            lr = psi.get('lighthouseResult', {})
-            cat = lr.get('categories', {})
-            audits = lr.get('audits', {})
-
-            # Extract scores
-            result['performance'] = round(cat.get('performance', {}).get('score', 0) * 100, 1)
-            result['accessibility'] = round(cat.get('accessibility', {}).get('score', 0) * 100, 1)
-            result['best_practices'] = round(cat.get('best-practices', {}).get('score', 0) * 100, 1)
-            result['seo'] = round(cat.get('seo', {}).get('score', 0) * 100, 1)
-
-            # Extract vitals
-            result['lcp'] = audits.get('largest-contentful-paint', {}).get('displayValue', 'N/A')
-            result['cls'] = audits.get('cumulative-layout-shift', {}).get('displayValue', 'N/A')
-            result['fcp'] = audits.get('first-contentful-paint', {}).get('displayValue', 'N/A')
-
+                pagespeed_api_url = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
+                params = {"url": final_url, "strategy": "desktop", "category": ["performance","accessibility","best-practices","seo","pwa"], "key": PAGESPEED_API_KEY}
+                psi_res = requests.get(pagespeed_api_url, params=params, timeout=60)
+                if psi_res.status_code == 200:
+                    psi = psi_res.json()
+                    lr = psi.get('lighthouseResult', {})
+                    cat = lr.get('categories', {})
+                    audits = lr.get('audits', {})
+                    result['performance'] = round(cat.get('performance', {}).get('score', 0) * 100, 1)
+                    result['accessibility'] = round(cat.get('accessibility', {}).get('score', 0) * 100, 1)
+                    result['best_practices'] = round(cat.get('best-practices', {}).get('score', 0) * 100, 1)
+                    result['seo'] = round(cat.get('seo', {}).get('score', 0) * 100, 1)
+                    result['lcp'] = audits.get('largest-contentful-paint', {}).get('displayValue', 'N/A')
+                    result['cls'] = audits.get('cumulative-layout-shift', {}).get('displayValue', 'N/A')
+                    result['fcp'] = audits.get('first-contentful-paint', {}).get('displayValue', 'N/A')
         except Exception as e:
-            logger.error(f"37Metrics Audit Task Error for {url}: {e}")
+            print(f"37Metrics Audit Task Error for {url}: {e}")
 
         avg = (result['performance'] + result['accessibility'] + result['best_practices'] + result['seo']) / 4
         result['overall_score'] = round(avg, 1)
         result['grade'] = "A" if avg >= 90 else "B" if avg >= 80 else "C" if avg >= 70 else "D" if avg >= 60 else "F"
 
-        audit = Audit(website_id=website_id, data=json.dumps(result))
-        db.session.add(audit)
-        db.session.commit()
-        logger.info(f"Audit for {url} completed with score {result['overall_score']}")
+        try:
+            audit = Audit(website_id=website_id, data=json.dumps(result))
+            db.session.add(audit)
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"DB Error saving audit: {e}")
+
+        print(f"Audit for {url} completed with score {result['overall_score']}")
 
 # ==================== ROUTES ====================
-@app.route('/', methods=['GET', 'POST'])
-@app.route('/login', methods=['GET', 'POST'])
+@app.route('/', methods=['GET','POST'])
+@app.route('/login', methods=['GET','POST'])
 def login():
     if current_user.is_authenticated:
         return redirect('/dashboard')
@@ -177,14 +168,19 @@ def dashboard():
 @login_required
 def add():
     url = request.form['url'].strip()
-    if not url.startswith(('http://', 'https://')):
+    if not url.startswith(('http://','https://')):
         url = 'https://' + url
     name = request.form.get('name', urlparse(url).netloc)
+
     site = Website(url=url, name=name, user_id=current_user.id)
-    db.session.add(site)
-    db.session.commit()
-    run_full_audit_task.delay(site.id)
-    flash('Full 37-metric audit started (may take 30-90 seconds to appear)!', 'success')
+    try:
+        db.session.add(site)
+        db.session.commit()
+        run_full_audit_task.delay(site.id)
+        flash('Full 37-metric audit started (30-90s)!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Error starting audit: {e}", 'error')
     return redirect('/dashboard')
 
 @app.route('/results/<int:site_id>')
@@ -194,15 +190,17 @@ def results(site_id):
     if site.user_id != current_user.id:
         return redirect('/dashboard')
     latest = Audit.query.filter_by(website_id=site_id).order_by(Audit.created_at.desc()).first()
-    audit = json.loads(latest.data) if latest else {"overall_score": "...", "performance": "...", "accessibility": "...", "seo": "...", "lcp": "N/A"}
     if not latest:
-        flash('Audit is still running in the background. Check back shortly.', 'warning')
+        audit = { "overall_score": "...", "performance": "...", "accessibility": "...", "seo": "...", "lcp": "N/A" }
+        flash('Audit is still running in background.', 'warning')
+    else:
+        audit = json.loads(latest.data)
     return render_template('results.html', site=site, audit=audit, logo=LOGO)
 
 @app.route('/download/<int:site_id>')
 @login_required
 def download(site_id):
-    flash('PDF download is currently disabled for deployment stability.', 'warning')
+    flash('PDF download disabled for deployment stability.', 'warning')
     return redirect(url_for('results', site_id=site_id))
 
 @app.route('/logout')
@@ -211,7 +209,7 @@ def logout():
     logout_user()
     return redirect('/')
 
-# ==================== DB INIT + ADMIN ====================
+# ==================== DB INIT ====================
 with app.app_context():
     db.create_all()
     if not User.query.filter_by(email='roy.jamshaid@gmail.com').first():
@@ -223,7 +221,7 @@ with app.app_context():
         db.session.add(admin)
         db.session.commit()
 
-# ==================== WSGI ENTRYPOINT ====================
+# ==================== RAILWAY/GUNICORN ====================
 application = app
 
 if __name__ == "__main__":
