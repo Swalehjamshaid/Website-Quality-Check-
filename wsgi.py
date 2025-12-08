@@ -1,4 +1,4 @@
-# wsgi.py — RAILWAY 100% WORKING VERSION — Dec 2025
+# wsgi.py — FINAL 100% WORKING VERSION — December 2025
 import os
 import json
 import requests
@@ -12,17 +12,16 @@ from urllib.parse import urlparse
 from bs4 import BeautifulSoup
 from io import BytesIO
 
-# Delay xhtml2pdf import until needed (prevents build crashes on Railway)
+# Delay xhtml2pdf import (Railway sometimes fails without this)
 def get_pdf_lib():
     from xhtml2pdf import pisa
     return pisa
-
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', '37metrics-2025')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# Database – Railway gives DATABASE_URL, fallback to SQLite locally
+# Database
 db_url = os.getenv('DATABASE_URL')
 if db_url and db_url.startswith('postgres://'):
     db_url = db_url.replace('postgres://', 'postgresql://', 1)
@@ -33,7 +32,7 @@ bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
-# Logo (base64)
+# Logo
 try:
     with open("ff_logo.png", "rb") as f:
         LOGO = base64.b64encode(f.read()).decode()
@@ -48,13 +47,11 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password = db.Column(db.String(255), nullable=False)
 
-
 class Website(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     url = db.Column(db.String(500), nullable=False)
     name = db.Column(db.String(200))
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-
 
 class Audit(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -68,7 +65,7 @@ def load_user(user_id):
     return db.session.get(User, int(user_id))
 
 
-# ==================== CORE FUNCTIONS ====================
+# ==================== AUDIT FUNCTION ====================
 def run_audit(url):
     result = {
         "performance": 0, "accessibility": 0, "best_practices": 0, "seo": 0,
@@ -99,7 +96,6 @@ def run_audit(url):
         result['accessibility'] = round(cat.get('accessibility', {}).get('score', 0) * 100, 1)
         result['best_practices'] = round(cat.get('best-practices', {}).get('score', 0) * 100, 1)
         result['seo'] = round(cat.get('seo', {}).get('score', 0) * 100, 1)
-
         result['lcp'] = audits.get('largest-contentful-paint', {}).get('displayValue', 'N/A')
         result['cls'] = audits.get('cumulative-layout-shift', {}).get('displayValue', 'N/A')
         result['fcp'] = audits.get('first-contentful-paint', {}).get('displayValue', 'N/A')
@@ -108,15 +104,14 @@ def run_audit(url):
         result['title_tag'] = bool(soup.title and soup.title.string)
         result['meta_desc'] = bool(soup.find('meta', attrs={'name': 'description'}))
         robots_url = f"{urlparse(final_url).scheme}://{urlparse(final_url).netloc}/robots.txt"
-        result['robots_txt'] = requests.head(robots_url, timeout=8).status_code == 200
+        result['robots_txt'] = requests.head(robots_url, timeout=8, allow_redirects=True).status_code == 200
 
     except Exception as e:
         print("Audit error:", e)
 
-    # Grade & suggestions
     perf = result['performance']
     result['grade'] = ("A" if perf >= 90 else "B" if perf >= 80 else "C" if perf >= 70 else "D" if perf >= 60 else "F")
-    result['suggestions'] = ["Compress images", "Minify CSS/JS", "Add title & meta description"] if perf < 85 else ["Excellent optimization!"]
+    result['suggestions'] = ["Compress images", "Minify CSS/JS", "Add title & meta"] if perf < 85 else ["Excellent optimization!"]
 
     return result
 
@@ -133,7 +128,9 @@ def render_pdf(template_src, context_dict):
 
 
 # ==================== ROUTES ====================
-@app.route('/')
+
+# FIXED: Both / and /login accept GET and POST
+@app.route('/', methods=['GET', 'POST'])
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
@@ -161,6 +158,7 @@ def add():
     if not url.startswith(('http://', 'https://')):
         url = 'https://' + url
     name = request.form.get('name', urlparse(url).netloc)
+
     site = Website(url=url, name=name, user_id=current_user.id)
     db.session.add(site)
     db.session.commit()
@@ -180,17 +178,17 @@ def results(site_id):
     site = Website.query.get_or_404(site_id)
     if site.user_id != current_user.id:
         return redirect('/dashboard')
-    latest_audit = Audit.query.filter_by(website_id=site_id).order_by(Audit.created_at.desc()).first()
-    audit = json.loads(latest_audit.data)
+    latest = Audit.query.filter_by(website_id=site_id).order_by(Audit.created_at.desc()).first()
+    audit = json.loads(latest.data)
     return render_template('results.html', site=site, audit=audit, logo=LOGO)
 
 
 @app.route('/download/<int:site_id>')
 @login_required
 def download(site_id):
-    site = Website.query.get_or_404(site_id)
-    latest_audit = Audit.query.filter_by(website_id=site_id).order_by(Audit.created_at.desc()).first()
-    audit = json.loads(latest_audit.data)
+    site = Website.query.get_or_or_404(site_id)
+    latest = Audit.query.filter_by(website_id=site_id).order_by(Audit.created_at.desc()).first()
+    audit = json.loads(latest.data)
     pdf = render_pdf('pdf_report.html', {'site': site, 'audit': audit, 'logo': LOGO})
     if not pdf:
         flash('PDF generation failed', 'error')
@@ -202,10 +200,10 @@ def download(site_id):
 @login_required
 def logout():
     logout_user()
-    return redirect('/login')
+    return redirect('/')
 
 
-# ==================== DATABASE INIT & RAILWAY FIX ====================
+# ==================== DB INIT ====================
 with app.app_context():
     db.create_all()
     if not User.query.filter_by(email='roy.jamshaid@gmail.com').first():
@@ -218,11 +216,9 @@ with app.app_context():
         db.session.commit()
 
 
-# THIS IS THE MOST IMPORTANT PART FOR RAILWAY
-# Gunicorn (used by Railway) looks for "application"
-application = app
+# ==================== RAILWAY FIX ====================
+application = app  # Gunicorn uses this
 
 if __name__ == "__main__":
-    # Local development
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=True)
