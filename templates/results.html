@@ -1,23 +1,23 @@
 <!DOCTYPE html>
 <html>
-<head><title>Audit Report - {{ site.name }}</title>
+<head><title>Audit Report</title>
 <style>
-  body {font-family:Arial; background:#f9f9ff; padding:40px;}
-  .card {max-width:900px; margin:auto; background:white; padding:30px; border-radius:15px; box-shadow:0 10px 30px rgba(0,0,0,0.1);}
-  .score {font-size:48px; font-weight:bold;}
-  .good {color:#28a745;} .avg {color:#ffc107;} .bad {color:#dc3545;}
+  body {font-family:Arial; background:#f5f7ff; padding:40px;}
+  .card {max-width:900px; margin:auto; background:white; padding:40px; border-radius:20px; box-shadow:0 15px 35px rgba(0,0,0,0.1);}
+  .score {font-size:60px; font-weight:bold;}
+  .A {color:#28a745;} .B {color:#74b816;} .C {color:#ffc107;} .D {color:#fd7e14;} .F {color:#dc3545;}
 </style>
 </head>
 <body>
 <div class="card">
   <h1>Audit Report: {{ site.name or site.url }}</h1>
-  <p><a href="/dashboard">← Back to Dashboard</a></p>
+  <p><a href="/dashboard">Back to Dashboard</a></p>
 
-  <h2>Core Scores</h2>
-  <p>Performance: <span class="score {% if audit.performance >= 90 %}good{% elif audit.performance >= 50 %}avg{% else %}bad{% endif %}">{{ audit.performance }}</span>/100</p>
-  <p>Accessibility: <span class="score">{{ audit.accessibility }}</span>/100</p>
-  <p>Best Practices: <span class="score">{{ audit.best_practices }}</span>/100</p>
-  <p>SEO: <span class="score">{{ audit.seo }}</span>/100</p>
+  <h2>Overall Grade: <span class="score {{ audit.grade }}">{{ audit.grade }}</span></h2>
+  <p>Performance: {{ audit.performance }}/100</p>
+  <p>Accessibility: {{ audit.accessibility }}/100</p>
+  <p>Best Practices: {{ audit.best_practices }}/100</p>
+  <p>SEO: {{ audit.seo }}/100</p>
 
   <h2>Core Web Vitals</h2>
   <p>LCP: {{ audit.lcp }} | CLS: {{ audit.cls }} | FCP: {{ audit.fcp }}</p>
@@ -26,9 +26,7 @@
   <ul>
     <li>Title Tag: {% if audit.title_tag %}Yes{% else %}No{% endif %}</li>
     <li>Meta Description: {% if audit.meta_desc %}Yes{% else %}No{% endif %}</li>
-    <li>H1 Tag: {% if audit.h1_tag %}Yes{% else %}No{% endif %}</li>
     <li>robots.txt: {% if audit.robots_txt %}Found{% else %}Missing{% endif %}</li>
-    <li>sitemap.xml: {% if audit.sitemap_xml %}Found{% else %}Missing{% endif %}</li>
     <li>HTTPS: {% if audit.has_https %}Yes{% else %}No{% endif %}</li>
   </ul>
 </div>
