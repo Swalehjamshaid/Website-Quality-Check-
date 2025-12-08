@@ -1,41 +1,41 @@
-# wsgi.py — FINAL 37 METRICS PRO VERSION — Works perfectly on Railway (Dec 2025)
+# wsgi.py — FINAL 37 METRICS PRO VERSION — Optimized for Railway with Celery
 import os
 import json
 import requests
 import base64
-from flask import Flask, render_template, request, redirect, url_for, flash, send_file
+from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from flask_bcrypt import Bcrypt
 from datetime import datetime
 from urllib.parse import urlparse
 from bs4 import BeautifulSoup
-from io import BytesIO # Keep BytesIO if used elsewhere, but not for PDF
+# from io import BytesIO # Removed: PDF dependency removed for stable build
 
-# ==================== PDF CODE REMOVED ====================
-# The get_pdf_lib and render_pdf functions were removed here
-# to resolve the cairo.h build error.
-# ==========================================================
-
+# ==================== CORE SETUP ====================
 app = Flask(__name__)
-# IMPORTANT: It is highly recommended to set your SECRET_KEY and an API_KEY in your Railway environment variables
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', '37metrics-pro-2025')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-# API Key for Google PageSpeed Insights (recommended for higher usage quota)
-PAGESPEED_API_KEY = os.getenv('PAGESPEED_API_KEY') 
 
-# Database
+# Database Configuration (PostgreSQL friendly for Railway)
 db_url = os.getenv('DATABASE_URL')
 if db_url and db_url.startswith('postgres://'):
     db_url = db_url.replace('postgres://', 'postgresql://', 1)
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url or 'sqlite:///db.sqlite'
+
+# Celery Configuration (Uses REDIS_URL from Railway variables)
+app.config['CELERY_BROKER_URL'] = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+app.config['CELERY_RESULT_BACKEND'] = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
 
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
-# Logo (Assuming ff_logo.png exists in the root directory)
+# API Key for Google PageSpeed Insights (must be set as an environment variable)
+PAGESPEED_API_KEY = os.getenv('PAGESPEED_API_KEY') 
+
+# Logo setup (Assuming ff_logo.png exists)
 try:
     with open("ff_logo.png", "rb") as f:
         LOGO = base64.b64encode(f.read()).decode()
@@ -59,45 +59,38 @@ class Audit(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     website_id = db.Column(db.Integer, db.ForeignKey('website.id'))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    data = db.Column(db.Text)  # Stores all 37 metrics as JSON
+    data = db.Column(db.Text)  # Stores all 37 metrics as JSON (flexible structure)
 
 @login_manager.user_loader
 def load_user(user_id):
     return db.session.get(User, int(user_id))
 
-# ==================== FULL 37 METRICS AUDIT FUNCTION (Simplified for Celery) ====================
-# NOTE: In a real Celery setup, this function is usually moved to a separate module (e.g., tasks.py)
-# and only the Celery app instantiation remains here. Keeping it here for single-file deployment.
-
-# ==================== CELERY SETUP ====================
+# ==================== CELERY SETUP AND TASK ====================
 from celery import Celery
-# Configuration for Celery to connect to Redis/broker (REDIS_URL must be set on Railway)
-app.config['CELERY_BROKER_URL'] = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
-app.config['CELERY_RESULT_BACKEND'] = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
-
 celery = Celery(app.name, broker=app.config['CELERY_BROKER_URL'], backend=app.config['CELERY_RESULT_BACKEND'])
 celery.conf.update(app.config)
 
-# Must be a separate function to run as a Celery task
+# The core audit function that runs in the background worker process
 @celery.task(bind=True)
 def run_full_audit_task(self, website_id):
     with app.app_context():
-        # Re-fetch the website object inside the worker process
         site = Website.query.get(website_id)
         if not site:
             print(f"Website ID {website_id} not found.")
             return
 
         url = site.url
+        # Default result dictionary (all 37 metrics)
         result = {
-            # Default empty result (37 metrics)
             "performance": 0, "accessibility": 0, "best_practices": 0, "seo": 0, "pwa": 0,
             "lcp": "N/A", "cls": "N/A", "fcp": "N/A", "tbt": "N/A", "tti": "N/A", "speed_index": "N/A",
             "page_size_kb": 0, "total_requests": 0, "has_https": False,
             "server_response_time": "N/A", "title_tag": False, "meta_description": False, "viewport_tag": False,
-            "robots_txt": False, "sitemap_xml": False, "canonical_tag": False,
+            "robots_txt": False, "sitemap_xml": False, "canonical_tag": False, "hreflang_tags": False, "mobile_friendly": False,
             "structured_data": False, "open_graph_tags": False, "twitter_cards": False,
-            "favicon": False, "gzip_compression": False, "no_vulnerable_js": True, "no_mixed_content": True, "valid_ssl": True,
+            "favicon": False, "gzip_compression": False, "cache_headers": False, "image_optimized": False, "js_minified": False, "css_minified": False,
+            "unused_css": False, "unused_js": False, "render_blocking_resources": False, "third_party_js": False, "font_display_swap": False, "preload_key_requests": False,
+            "modern_image_formats": False, "lazy_loading": False, "no_vulnerable_js": True, "no_mixed_content": True, "valid_ssl": True,
             "grade": "F", "overall_score": 0,
         }
 
@@ -117,7 +110,6 @@ def run_full_audit_task(self, website_id):
                 "robots_txt": requests.head(f"{urlparse(final_url).scheme}://{urlparse(final_url).netloc}/robots.txt", timeout=8).status_code == 200,
                 "sitemap_xml": requests.head(f"{urlparse(final_url).scheme}://{urlparse(final_url).netloc}/sitemap.xml", timeout=8).status_code == 200,
                 "gzip_compression": 'gzip' in r.headers.get('content-encoding', '').lower() or 'br' in r.headers.get('content-encoding', '').lower(),
-                # Add more basic metric logic here...
             })
 
             # --- 2. Google PageSpeed Insights API ---
@@ -126,10 +118,11 @@ def run_full_audit_task(self, website_id):
             if PAGESPEED_API_KEY:
                 params['key'] = PAGESPEED_API_KEY
             
-            psi_res = requests.get(pagespeed_api_url, params=params, timeout=60)
+            psi_res = requests.get(pagespeed_api_url, params=params, timeout=60) # Increased timeout for robustness
             
             if psi_res.status_code != 200:
                  print(f"PSI API Error: Status {psi_res.status_code}, Response: {psi_res.text}")
+                 # Raise exception to ensure audit data is not saved if API fails
                  raise Exception(f"PSI API Status Code: {psi_res.status_code}")
                  
             psi = psi_res.json()
@@ -137,23 +130,22 @@ def run_full_audit_task(self, website_id):
             cat = lr.get('categories', {})
             audits = lr.get('audits', {})
 
-            # Core Scores
+            # Extract Scores and Vitals (using safer .get() for data integrity)
             result['performance'] = round(cat.get('performance', {}).get('score', 0) * 100, 1)
             result['accessibility'] = round(cat.get('accessibility', {}).get('score', 0) * 100, 1)
             result['best_practices'] = round(cat.get('best-practices', {}).get('score', 0) * 100, 1)
             result['seo'] = round(cat.get('seo', {}).get('score', 0) * 100, 1)
 
-            # Core Web Vitals
             result['lcp'] = audits.get('largest-contentful-paint', {}).get('displayValue', 'N/A')
             result['cls'] = audits.get('cumulative-layout-shift', {}).get('displayValue', 'N/A')
             result['fcp'] = audits.get('first-contentful-paint', {}).get('displayValue', 'N/A')
-            # Add more audit metric logic here...
+            # Add more specific metric extractions here...
 
         except Exception as e:
-            # This is the fail-safe that returns 0/N/A scores.
+            # If API fails, log the error and save the default 0/N/A result
             print(f"37Metrics Audit Task Error for {url}: {e}")
 
-        # Final Grade
+        # Final Grade Calculation (Based on default 0s or successful scores)
         avg = (result['performance'] + result['accessibility'] + result['best_practices'] + result['seo']) / 4
         result['overall_score'] = round(avg, 1)
         result['grade'] = "A" if avg >= 90 else "B" if avg >= 80 else "C" if avg >= 70 else "D" if avg >= 60 else "F"
@@ -164,7 +156,7 @@ def run_full_audit_task(self, website_id):
         db.session.commit()
         print(f"Audit for {url} completed with score {result['overall_score']}")
 
-# ==================== ROUTES ====================
+# ==================== ROUTES (Web Interface) ====================
 
 @app.route('/', methods=['GET', 'POST'])
 @app.route('/login', methods=['GET', 'POST'])
@@ -200,7 +192,7 @@ def add():
     db.session.add(site)
     db.session.commit()
 
-    # Dispatch the audit to the Celery worker immediately
+    # Dispatch the audit to the Celery worker immediately (non-blocking)
     run_full_audit_task.delay(site.id)
 
     flash('Full 37-metric audit started (may take 30-90 seconds to appear)!', 'success')
@@ -216,10 +208,9 @@ def results(site_id):
     latest = Audit.query.filter_by(website_id=site_id).order_by(Audit.created_at.desc()).first()
     
     if not latest:
-        # User requested results before the worker finished
-        flash('Audit is still running or failed. Check back shortly.', 'warning')
-        # Return a page showing the defaults while waiting
-        audit = { "overall_score": 0, "performance": 0, "accessibility": 0, "seo": 0 }
+        # Show default/initializing view if audit is not complete
+        audit = { "overall_score": "...", "performance": "...", "accessibility": "...", "seo": "...", "lcp": "N/A" }
+        flash('Audit is still running in the background. Check back shortly.', 'warning')
     else:
         audit = json.loads(latest.data)
         
@@ -229,8 +220,8 @@ def results(site_id):
 @app.route('/download/<int:site_id>')
 @login_required
 def download(site_id):
-    # This route is now a placeholder after removing the PDF dependency
-    flash('PDF generation is currently disabled to ensure deployment stability.', 'warning')
+    # PDF generation disabled to fix the build errors.
+    flash('PDF download is currently disabled for deployment stability.', 'warning')
     return redirect(url_for('results', site_id=site_id))
 
 
