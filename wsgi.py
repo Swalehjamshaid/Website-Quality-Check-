@@ -1,4 +1,4 @@
-# wsgi.py — FINAL 37 METRICS PRO VERSION — Optimized for Railway with Celery
+# wsgi.py — FINAL 37 METRICS PRO VERSION — Python-only Celery + Redis fix
 import os
 import json
 import requests
@@ -26,10 +26,25 @@ if db_url and db_url.startswith('postgres://'):
     db_url = db_url.replace('postgres://', 'postgresql://', 1)
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url or 'sqlite:///db.sqlite'
 
-# Celery Configuration
-app.config['CELERY_BROKER_URL'] = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
-app.config['CELERY_RESULT_BACKEND'] = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+# ==================== CELERY SETUP (Python-only) ====================
+from celery import Celery
 
+# Use REDIS_URL env variable if present, else default to localhost
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+
+celery = Celery(
+    app.name,
+    broker=REDIS_URL,
+    backend=REDIS_URL
+)
+celery.conf.update(
+    task_track_started=True,
+    task_serializer="json",
+    accept_content=["json"],
+    result_serializer="json",
+)
+
+# ==================== EXTENSIONS ====================
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
@@ -67,11 +82,7 @@ class Audit(db.Model):
 def load_user(user_id):
     return db.session.get(User, int(user_id))
 
-# ==================== CELERY SETUP ====================
-from celery import Celery
-celery = Celery(app.name, broker=app.config['CELERY_BROKER_URL'], backend=app.config['CELERY_RESULT_BACKEND'])
-celery.conf.update(app.config)
-
+# ==================== CELERY TASK ====================
 @celery.task(bind=True)
 def run_full_audit_task(self, website_id):
     with app.app_context():
@@ -81,18 +92,18 @@ def run_full_audit_task(self, website_id):
             return
 
         url = site.url
-        result = {
-            "performance": 0, "accessibility": 0, "best_practices": 0, "seo": 0, "pwa": 0,
-            "lcp": "N/A", "cls": "N/A", "fcp": "N/A", "tbt": "N/A", "tti": "N/A", "speed_index": "N/A",
-            "page_size_kb": 0, "total_requests": 0, "has_https": False,
-            "server_response_time": "N/A", "title_tag": False, "meta_description": False, "viewport_tag": False,
-            "robots_txt": False, "sitemap_xml": False, "canonical_tag": False, "hreflang_tags": False, "mobile_friendly": False,
-            "structured_data": False, "open_graph_tags": False, "twitter_cards": False,
-            "favicon": False, "gzip_compression": False, "cache_headers": False, "image_optimized": False, "js_minified": False, "css_minified": False,
-            "unused_css": False, "unused_js": False, "render_blocking_resources": False, "third_party_js": False, "font_display_swap": False, "preload_key_requests": False,
-            "modern_image_formats": False, "lazy_loading": False, "no_vulnerable_js": True, "no_mixed_content": True, "valid_ssl": True,
-            "grade": "F", "overall_score": 0,
-        }
+        result = { "performance":0, "accessibility":0, "best_practices":0, "seo":0, "pwa":0,
+                   "lcp":"N/A","cls":"N/A","fcp":"N/A","tbt":"N/A","tti":"N/A","speed_index":"N/A",
+                   "page_size_kb":0,"total_requests":0,"has_https":False,
+                   "server_response_time":"N/A","title_tag":False,"meta_description":False,"viewport_tag":False,
+                   "robots_txt":False,"sitemap_xml":False,"canonical_tag":False,"hreflang_tags":False,"mobile_friendly":False,
+                   "structured_data":False,"open_graph_tags":False,"twitter_cards":False,
+                   "favicon":False,"gzip_compression":False,"cache_headers":False,"image_optimized":False,
+                   "js_minified":False,"css_minified":False,"unused_css":False,"unused_js":False,
+                   "render_blocking_resources":False,"third_party_js":False,"font_display_swap":False,
+                   "preload_key_requests":False,"modern_image_formats":False,"lazy_loading":False,
+                   "no_vulnerable_js":True,"no_mixed_content":True,"valid_ssl":True,
+                   "grade":"F","overall_score":0 }
 
         try:
             headers = {'User-Agent': '37Metrics-Pro-Auditor v2.0 (+https://37metrics.live)'}
@@ -101,38 +112,38 @@ def run_full_audit_task(self, website_id):
             soup = BeautifulSoup(r.text, 'html.parser')
 
             result.update({
-                "page_size_kb": round(len(r.content) / 1024, 1),
+                "page_size_kb": round(len(r.content)/1024,1),
                 "server_response_time": f"{r.elapsed.total_seconds():.2f}s",
                 "has_https": final_url.startswith('https://'),
-                "title_tag": bool(soup.title and soup.title.string and len(soup.title.string.strip()) > 0),
-                "meta_description": bool(soup.find('meta', attrs={'name': 'description'})),
-                "robots_txt": requests.head(f"{urlparse(final_url).scheme}://{urlparse(final_url).netloc}/robots.txt", timeout=8).status_code == 200,
-                "sitemap_xml": requests.head(f"{urlparse(final_url).scheme}://{urlparse(final_url).netloc}/sitemap.xml", timeout=8).status_code == 200,
-                "gzip_compression": 'gzip' in r.headers.get('content-encoding', '').lower() or 'br' in r.headers.get('content-encoding', '').lower(),
+                "title_tag": bool(soup.title and soup.title.string and len(soup.title.string.strip())>0),
+                "meta_description": bool(soup.find('meta', attrs={'name':'description'})),
+                "robots_txt": requests.head(f"{urlparse(final_url).scheme}://{urlparse(final_url).netloc}/robots.txt", timeout=8).status_code==200,
+                "sitemap_xml": requests.head(f"{urlparse(final_url).scheme}://{urlparse(final_url).netloc}/sitemap.xml", timeout=8).status_code==200,
+                "gzip_compression": 'gzip' in r.headers.get('content-encoding','').lower() or 'br' in r.headers.get('content-encoding','').lower()
             })
 
             if PAGESPEED_API_KEY:
                 pagespeed_api_url = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
-                params = {"url": final_url, "strategy": "desktop", "category": ["performance","accessibility","best-practices","seo","pwa"], "key": PAGESPEED_API_KEY}
+                params = {"url": final_url,"strategy":"desktop","category":["performance","accessibility","best-practices","seo","pwa"],"key":PAGESPEED_API_KEY}
                 psi_res = requests.get(pagespeed_api_url, params=params, timeout=60)
-                if psi_res.status_code == 200:
+                if psi_res.status_code==200:
                     psi = psi_res.json()
                     lr = psi.get('lighthouseResult', {})
                     cat = lr.get('categories', {})
                     audits = lr.get('audits', {})
-                    result['performance'] = round(cat.get('performance', {}).get('score', 0) * 100, 1)
-                    result['accessibility'] = round(cat.get('accessibility', {}).get('score', 0) * 100, 1)
-                    result['best_practices'] = round(cat.get('best-practices', {}).get('score', 0) * 100, 1)
-                    result['seo'] = round(cat.get('seo', {}).get('score', 0) * 100, 1)
-                    result['lcp'] = audits.get('largest-contentful-paint', {}).get('displayValue', 'N/A')
-                    result['cls'] = audits.get('cumulative-layout-shift', {}).get('displayValue', 'N/A')
-                    result['fcp'] = audits.get('first-contentful-paint', {}).get('displayValue', 'N/A')
+                    result['performance'] = round(cat.get('performance', {}).get('score',0)*100,1)
+                    result['accessibility'] = round(cat.get('accessibility', {}).get('score',0)*100,1)
+                    result['best_practices'] = round(cat.get('best-practices', {}).get('score',0)*100,1)
+                    result['seo'] = round(cat.get('seo', {}).get('score',0)*100,1)
+                    result['lcp'] = audits.get('largest-contentful-paint', {}).get('displayValue','N/A')
+                    result['cls'] = audits.get('cumulative-layout-shift', {}).get('displayValue','N/A')
+                    result['fcp'] = audits.get('first-contentful-paint', {}).get('displayValue','N/A')
         except Exception as e:
             print(f"37Metrics Audit Task Error for {url}: {e}")
 
-        avg = (result['performance'] + result['accessibility'] + result['best_practices'] + result['seo']) / 4
-        result['overall_score'] = round(avg, 1)
-        result['grade'] = "A" if avg >= 90 else "B" if avg >= 80 else "C" if avg >= 70 else "D" if avg >= 60 else "F"
+        avg = (result['performance']+result['accessibility']+result['best_practices']+result['seo'])/4
+        result['overall_score'] = round(avg,1)
+        result['grade'] = "A" if avg>=90 else "B" if avg>=80 else "C" if avg>=70 else "D" if avg>=60 else "F"
 
         try:
             audit = Audit(website_id=website_id, data=json.dumps(result))
@@ -221,7 +232,7 @@ with app.app_context():
         db.session.add(admin)
         db.session.commit()
 
-# ==================== RAILWAY/GUNICORN ====================
+# ==================== RUN APP ====================
 application = app
 
 if __name__ == "__main__":
