@@ -1,0 +1,1 @@
+worker: celery -A wsgi:celery worker --loglevel=info --pool=solo
