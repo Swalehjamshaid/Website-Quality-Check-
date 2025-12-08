@@ -3,21 +3,21 @@
 <head>
   <title>37Metrics Dashboard</title>
   <style>
-    body {font-family: Arial; background:#f5f7ff; margin:0;}
-    .header {background: linear-gradient(90deg, #5e35b1, #7e57c2); color:white; padding:20px; text-align:center;}
-    .container {max-width:1000px; margin:30px auto; padding:20px;}
-    .card {background:white; padding:30px; border-radius:15px; box-shadow:0 10px 30px rgba(0,0,0,0.1);}
-    input, button {padding:15px; margin:10px; font-size:16px; border-radius:10px;}
+    body {font-family: 'Segoe UI', sans-serif; background:#f8f9ff; margin:0;}
+    .header {background: linear-gradient(90deg, #5e35b1, #7e57c2); color:white; padding:25px; text-align:center;}
+    .container {max-width:1100px; margin:40px auto; padding:20px;}
+    .card {background:white; padding:40px; border-radius:20px; box-shadow:0 15px 40px rgba(0,0,0,0.1);}
+    input, select, button {padding:16px; margin:10px 5px; font-size:16px; border-radius:12px; border:1px solid #ddd;}
     button {background:#5e35b1; color:white; border:none; cursor:pointer;}
-    .success {background:#d4edda; color:#155724; padding:15px; border-radius:10px; margin:20px 0;}
-    .site {padding:15px; background:#f8f9fa; margin:10px 0; border-radius:10px; display:flex; justify-content:space-between; align-items:center;}
-    .btn {background:#28a745; color:white; padding:10px 20px; text-decoration:none; border-radius:8px;}
+    .success {background:#d4edda; color:#155724; padding:15px; border-radius:12px; margin:20px 0;}
+    .site {padding:20px; background:#f8f9fa; margin:15px 0; border-radius:15px; display:flex; justify-content:space-between; align-items:center;}
+    .btn {background:#28a745; color:white; padding:12px 25px; text-decoration:none; border-radius:10px;}
   </style>
 </head>
 <body>
 <div class="header">
   <h1>37Metrics</h1>
-  <p>Welcome, {{ name }} | <a href="/logout" style="color:white;">Logout</a></p>
+  <p>Welcome back, <strong>{{ name }}</strong> | <a href="/logout" style="color:white;">Logout</a></p>
 </div>
 <div class="container">
   <div class="card">
@@ -25,23 +25,36 @@
       {% if messages %}<div class="success">{{ messages[-1] }}</div>{% endif %}
     {% endwith %}
 
-    <h2>Add Website for Full Audit</h2>
+    <h2>Add New Website</h2>
     <form method="post" action="/add">
-      <input name="url" placeholder="https://example.com" required style="width:400px;">
+      <input name="url" placeholder="https://example.com" required style="width:380px;">
       <input name="name" placeholder="Website name (optional)" style="width:300px;">
-      <button type="submit">Start Full 37-Metric Audit</button>
+      <select name="frequency">
+        <option value="never">No scheduled reports</option>
+        <option value="daily">Daily</option>
+        <option value="weekly">Weekly</option>
+        <option value="monthly">Monthly</option>
+      </select>
+      <input name="send_time" type="time" value="09:00">
+      <button type="submit">Start Full Audit</button>
     </form>
 
-    <h2>Your Websites</h2>
+    <h2>Your Websites ({{ sites|length }})</h2>
     {% if sites %}
       {% for s in sites %}
       <div class="site">
-        <strong>{{ s.name or s.url }}</strong>
-        <a href="/results/{{ s.id }}" class="btn">View Full Report</a>
+        <div>
+          <strong>{{ s.name or s.url }}</strong><br>
+          <small>Schedule: {{ s.frequency }} at {{ s.send_time }}</small>
+        </div>
+        <div>
+          <a href="/results/{{ s.id }}" class="btn">View Report</a>
+          <a href="/download/{{ s.id }}" class="btn" style="background:#17a2b8; margin-left:10px;">PDF</a>
+        </div>
       </div>
       {% endfor %}
     {% else %}
-      <p>No websites added yet.</p>
+      <p>No websites added yet. Add one above!</p>
     {% endif %}
   </div>
 </div>
