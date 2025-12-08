@@ -1,57 +1,39 @@
-# wsgi.py — FINAL WORKING VERSION — NO CRASH ON RAILWAY — Dec 2025
+# wsgi.py — FINAL BEAUTIFUL + 100% WORKING — FF Web Audit / 37Metrics
 import os
 import json
 import requests
-from flask import Flask, render_template, request, redirect, url_for, flash, send_file
+from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from flask_bcrypt import Bcrypt
-from flask_mail import Mail, Message
 from datetime import datetime
 from urllib.parse import urlparse
 from bs4 import BeautifulSoup
-import base64
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'ffwebaudit-2025')
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', '37metrics-final-2025')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# Database fix
+# Database fix for Railway
 db_url = os.getenv('DATABASE_URL', 'sqlite:///db.sqlite')
 if db_url and db_url.startswith('postgres://'):
     db_url = db_url.replace('postgres://', 'postgresql://', 1)
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 
-# Email (Set in Railway Variables)
-app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
-app.config['MAIL_PORT'] = 587
-app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME')
-app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD')
-app.config['MAIL_DEFAULT_SENDER'] = 'FF Web Audit <no-reply@ffwebaudit.com>'
-
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
-mail = Mail(app)
-
-# Logo (safe fallback if file missing)
-try:
-    with open("ff_logo.png", "rb") as f:
-        LOGO_BASE64 = base64.b64encode(f.read()).decode()
-except:
-    LOGO_BASE64 = ""  # Will show text logo
 
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100))
-    email = db.Column(db.String(120), unique=True)
-    password = db.Column(db.String(255))
+    name = db.Column(db.String(100), default='User')
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password = db.Column(db.String(255), nullable=False)
 
 class Website(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    url = db.Column(db.String(500))
+    url = db.Column(db.String(500), nullable=False)
     name = db.Column(db.String(200))
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
 
@@ -65,20 +47,12 @@ class Audit(db.Model):
 def load_user(user_id):
     return db.session.get(User, int(user_id))
 
-def get_grade(score):
-    if score >= 90: return "A", "#28a745"
-    elif score >= 80: return "B", "#74b816"
-    elif score >= 70: return "C", "#ffc107"
-    elif score >= 60: return "D", "#fd7e14"
-    else: return "F", "#dc3545"
-
 def run_audit(url):
     result = {"performance": 0, "accessibility": 0, "best_practices": 0, "seo": 0,
               "lcp": "N/A", "cls": "N/A", "fcp": "N/A", "status_code": 0, "page_size_kb": 0,
               "title_tag": False, "meta_desc": False, "robots_txt": False, "has_https": False}
-    
     try:
-        headers = {'User-Agent': 'FFWebAuditBot/1.0'}
+        headers = {'User-Agent': '37MetricsBot'}
         r = requests.get(url, timeout=20, headers=headers, allow_redirects=True)
         final_url = r.url
         result.update({
@@ -105,15 +79,11 @@ def run_audit(url):
         result['meta_desc'] = bool(soup.find('meta', attrs={'name': 'description'}))
         result['robots_txt'] = requests.head(f"{urlparse(final_url).scheme}://{urlparse(final_url).netloc}/robots.txt", timeout=8).status_code == 200
 
-        result['grade'], result['color'] = get_grade(result['performance'])
-
     except Exception as e:
-        print("Audit failed:", e)
+        print("Audit error:", e)
 
+    result['grade'] = "A" if result['performance'] >= 90 else "B" if result['performance'] >= 80 else "C" if result['performance'] >= 70 else "D" if result['performance'] >= 60 else "F"
     return result
-
-@app.route('/')
-def index(): return redirect('/login')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -122,28 +92,14 @@ def login():
         if user and bcrypt.check_password_hash(user.password, request.form['password']):
             login_user(user)
             return redirect('/dashboard')
-        flash('Invalid credentials')
+        flash('Invalid email or password', 'error')
     return render_template('login.html')
-
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    if request.method == 'POST':
-        if User.query.filter_by(email=request.form['email']).first():
-            flash('Email already taken')
-        else:
-            user = User(name=request.form['name'], email=request.form['email'],
-                        password=bcrypt.generate_password_hash(request.form['password']))
-            db.session.add(user)
-            db.session.commit()
-            flash('Registered! Please login.')
-            return redirect('/login')
-    return render_template('register.html')
 
 @app.route('/dashboard')
 @login_required
 def dashboard():
     sites = Website.query.filter_by(user_id=current_user.id).all()
-    return render_template('dashboard.html', sites=sites, logo=LOGO_BASE64)
+    return render_template('dashboard.html', sites=sites, name=current_user.name)
 
 @app.route('/add', methods=['POST'])
 @login_required
@@ -152,17 +108,17 @@ def add():
     if not url.startswith(('http://', 'https://')):
         url = 'https://' + url
     name = request.form.get('name', urlparse(url).netloc)
-    
+
     site = Website(url=url, name=name, user_id=current_user.id)
     db.session.add(site)
     db.session.commit()
 
-    data = run_audit(url)
-    audit = Audit(website_id=site.id, data=json.dumps(data))
+    audit_data = run_audit(url)
+    audit = Audit(website_id=site.id, data=json.dumps(audit_data))
     db.session.add(audit)
     db.session.commit()
 
-    flash('Website added & audit completed!')
+    flash('Success: Audit completed!', 'success')
     return redirect('/dashboard')
 
 @app.route('/results/<int:site_id>')
@@ -172,7 +128,7 @@ def results(site_id):
     if site.user_id != current_user.id:
         return redirect('/dashboard')
     audit = json.loads(Audit.query.filter_by(website_id=site_id).order_by(Audit.created_at.desc()).first().data)
-    return render_template('results.html', site=site, audit=audit, logo=LOGO_BASE64)
+    return render_template('results.html', site=site, audit=audit)
 
 @app.route('/logout')
 @login_required
@@ -189,6 +145,3 @@ with app.app_context():
         db.session.commit()
 
 application = app
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.getenv('PORT', 5000)))
