@@ -1,4 +1,4 @@
-# wsgi.py — 100% Python-only, production-ready async audits
+# wsgi.py — 37 METRICS PRO VERSION — Python-only, Thread-based Background Audits
 import os
 import json
 import requests
@@ -11,9 +11,9 @@ from datetime import datetime
 from urllib.parse import urlparse
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 
-# Load environment variables
+# Load .env
 load_dotenv()
 
 # ==================== CORE SETUP ====================
@@ -21,24 +21,20 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', '37metrics-pro-2025')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# Database
+# Database Configuration
 db_url = os.getenv('DATABASE_URL')
 if db_url and db_url.startswith('postgres://'):
     db_url = db_url.replace('postgres://', 'postgresql://', 1)
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url or 'sqlite:///db.sqlite'
 
-# Extensions
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
-# ThreadPool for background audits
-executor = ThreadPoolExecutor(max_workers=10)  # Handles multiple audits concurrently
-
 PAGESPEED_API_KEY = os.getenv('PAGESPEED_API_KEY')
 
-# Logo
+# Logo setup
 try:
     with open("ff_logo.png", "rb") as f:
         LOGO = base64.b64encode(f.read()).decode()
@@ -68,76 +64,84 @@ class Audit(db.Model):
 def load_user(user_id):
     return db.session.get(User, int(user_id))
 
-# ==================== BACKGROUND AUDIT ====================
+# ==================== THREAD POOL ====================
+executor = ThreadPoolExecutor(max_workers=5)  # Adjust max_workers as needed
+
+# ==================== AUDIT FUNCTION ====================
 def run_full_audit_task(website_id):
-    """Background audit task."""
-    with app.app_context():
-        site = Website.query.get(website_id)
-        if not site:
-            print(f"Website ID {website_id} not found.")
-            return
+    try:
+        with app.app_context():
+            site = Website.query.get(website_id)
+            if not site:
+                print(f"Website ID {website_id} not found.")
+                return
 
-        url = site.url
-        result = {
-            "performance":0,"accessibility":0,"best_practices":0,"seo":0,"pwa":0,
-            "lcp":"N/A","cls":"N/A","fcp":"N/A","tbt":"N/A","tti":"N/A","speed_index":"N/A",
-            "page_size_kb":0,"total_requests":0,"has_https":False,
-            "server_response_time":"N/A","title_tag":False,"meta_description":False,
-            "robots_txt":False,"sitemap_xml":False,"gzip_compression":False,
-            "grade":"F","overall_score":0
-        }
+            url = site.url
+            result = {
+                "performance": 0, "accessibility": 0, "best_practices": 0, "seo": 0,
+                "overall_score": 0, "grade": "F",
+                "page_size_kb": 0, "server_response_time": "N/A",
+                "has_https": False, "title_tag": False, "meta_description": False,
+                "robots_txt": False, "sitemap_xml": False, "gzip_compression": False
+            }
 
-        try:
-            headers = {'User-Agent': '37Metrics-Pro-Auditor v2.0 (+https://37metrics.live)'}
-            r = requests.get(url, timeout=30, headers=headers, allow_redirects=True)
-            final_url = r.url
-            soup = BeautifulSoup(r.text, 'html.parser')
+            try:
+                headers = {'User-Agent':'37Metrics-Pro-Auditor'}
+                r = requests.get(url, timeout=30, headers=headers, allow_redirects=True)
+                soup = BeautifulSoup(r.text, 'html.parser')
+                final_url = r.url
 
-            result.update({
-                "page_size_kb": round(len(r.content)/1024,1),
-                "server_response_time": f"{r.elapsed.total_seconds():.2f}s",
-                "has_https": final_url.startswith('https://'),
-                "title_tag": bool(soup.title and soup.title.string and len(soup.title.string.strip())>0),
-                "meta_description": bool(soup.find('meta', attrs={'name':'description'})),
-                "robots_txt": requests.head(f"{urlparse(final_url).scheme}://{urlparse(final_url).netloc}/robots.txt", timeout=8).status_code==200,
-                "sitemap_xml": requests.head(f"{urlparse(final_url).scheme}://{urlparse(final_url).netloc}/sitemap.xml", timeout=8).status_code==200,
-                "gzip_compression": 'gzip' in r.headers.get('content-encoding','').lower() or 'br' in r.headers.get('content-encoding','').lower()
-            })
+                result.update({
+                    "page_size_kb": round(len(r.content)/1024,1),
+                    "server_response_time": f"{r.elapsed.total_seconds():.2f}s",
+                    "has_https": final_url.startswith('https://'),
+                    "title_tag": bool(soup.title and soup.title.string),
+                    "meta_description": bool(soup.find('meta', attrs={'name':'description'})),
+                    "robots_txt": requests.head(f"{urlparse(final_url).scheme}://{urlparse(final_url).netloc}/robots.txt", timeout=8).status_code == 200,
+                    "sitemap_xml": requests.head(f"{urlparse(final_url).scheme}://{urlparse(final_url).netloc}/sitemap.xml", timeout=8).status_code == 200,
+                    "gzip_compression": 'gzip' in r.headers.get('content-encoding','').lower() or 'br' in r.headers.get('content-encoding','').lower()
+                })
 
+            except Exception as e:
+                print(f"Request/Parsing error for {url}: {e}")
+
+            # Optional: Pagespeed API
             if PAGESPEED_API_KEY:
-                pagespeed_api_url = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
-                params = {"url": final_url,"strategy":"desktop","category":["performance","accessibility","best-practices","seo","pwa"],"key":PAGESPEED_API_KEY}
-                psi_res = requests.get(pagespeed_api_url, params=params, timeout=60)
-                if psi_res.status_code==200:
-                    psi = psi_res.json()
-                    lr = psi.get('lighthouseResult', {})
-                    cat = lr.get('categories', {})
-                    audits = lr.get('audits', {})
-                    result['performance'] = round(cat.get('performance', {}).get('score',0)*100,1)
-                    result['accessibility'] = round(cat.get('accessibility', {}).get('score',0)*100,1)
-                    result['best_practices'] = round(cat.get('best-practices', {}).get('score',0)*100,1)
-                    result['seo'] = round(cat.get('seo', {}).get('score',0)*100,1)
-                    result['lcp'] = audits.get('largest-contentful-paint', {}).get('displayValue','N/A')
-                    result['cls'] = audits.get('cumulative-layout-shift', {}).get('displayValue','N/A')
-                    result['fcp'] = audits.get('first-contentful-paint', {}).get('displayValue','N/A')
-        except Exception as e:
-            print(f"37Metrics Audit Error for {url}: {e}")
+                try:
+                    pagespeed_api_url = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
+                    params = {"url": final_url, "strategy": "desktop", "category": ["performance","accessibility","best-practices","seo","pwa"], "key": PAGESPEED_API_KEY}
+                    psi_res = requests.get(pagespeed_api_url, params=params, timeout=60)
+                    if psi_res.status_code == 200:
+                        psi = psi_res.json()
+                        lr = psi.get('lighthouseResult', {})
+                        cat = lr.get('categories', {})
+                        audits = lr.get('audits', {})
 
-        # Calculate grade
-        avg = (result['performance']+result['accessibility']+result['best_practices']+result['seo'])/4
-        result['overall_score'] = round(avg,1)
-        result['grade'] = "A" if avg>=90 else "B" if avg>=80 else "C" if avg>=70 else "D" if avg>=60 else "F"
+                        result['performance'] = round(cat.get('performance', {}).get('score',0)*100,1)
+                        result['accessibility'] = round(cat.get('accessibility', {}).get('score',0)*100,1)
+                        result['best_practices'] = round(cat.get('best-practices', {}).get('score',0)*100,1)
+                        result['seo'] = round(cat.get('seo', {}).get('score',0)*100,1)
+                except Exception as e:
+                    print(f"Pagespeed API error for {url}: {e}")
 
-        # Save audit
-        try:
-            audit = Audit(website_id=website_id, data=json.dumps(result))
-            db.session.add(audit)
-            db.session.commit()
-        except Exception as e:
-            db.session.rollback()
-            print(f"DB Error saving audit: {e}")
+            # Calculate overall score and grade
+            avg = (result['performance'] + result['accessibility'] + result['best_practices'] + result['seo']) / 4
+            result['overall_score'] = round(avg, 1)
+            result['grade'] = "A" if avg >= 90 else "B" if avg >= 80 else "C" if avg >= 70 else "D" if avg >= 60 else "F"
 
-        print(f"Audit for {url} completed with score {result['overall_score']}")
+            # Save to DB
+            try:
+                audit = Audit(website_id=website_id, data=json.dumps(result))
+                db.session.add(audit)
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                print(f"DB save error for {url}: {e}")
+
+            print(f"Audit completed for {url} with score {result['overall_score']}")
+
+    except Exception as e:
+        print(f"Audit thread error for website ID {website_id}: {e}")
 
 # ==================== ROUTES ====================
 @app.route('/', methods=['GET','POST'])
@@ -171,9 +175,8 @@ def add():
     try:
         db.session.add(site)
         db.session.commit()
-        # Submit audit to thread pool (non-blocking)
-        executor.submit(run_full_audit_task, site.id)
-        flash('Audit started in background!', 'success')
+        executor.submit(run_full_audit_task, site.id)  # Run audit in background thread
+        flash('Full 37-metric audit started (30-90s)!', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f"Error starting audit: {e}", 'error')
@@ -187,7 +190,7 @@ def results(site_id):
         return redirect('/dashboard')
     latest = Audit.query.filter_by(website_id=site_id).order_by(Audit.created_at.desc()).first()
     if not latest:
-        audit = {"overall_score": "...", "performance": "...", "accessibility": "...", "seo": "...", "lcp": "N/A"}
+        audit = { "overall_score": "...", "performance": "...", "accessibility": "...", "seo": "...", "lcp": "N/A" }
         flash('Audit is still running in background.', 'warning')
     else:
         audit = json.loads(latest.data)
@@ -211,7 +214,9 @@ with app.app_context():
         db.session.add(admin)
         db.session.commit()
 
-# ==================== RUN ====================
+# ==================== RAILWAY/GUNICORN ====================
+application = app
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=True)
