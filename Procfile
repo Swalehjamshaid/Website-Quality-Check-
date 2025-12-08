@@ -1,1 +1,2 @@
-web: gunicorn wsgi:application --bind 0.0.0.0:$PORT
+web: gunicorn wsgi:application
+worker: celery -A wsgi:celery worker -l info
