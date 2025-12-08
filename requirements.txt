@@ -4,6 +4,6 @@ Flask-Login
 Flask-Bcrypt
 requests
 beautifulsoup4
+weasyprint
 gunicorn
 psycopg2-binary
-weasyprint
