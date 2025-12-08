@@ -1,4 +1,4 @@
-# wsgi.py — FINAL 37 METRICS PRO VERSION — Python-only Celery + Redis fix
+# wsgi.py — 100% Python-only, no Redis, no Celery
 import os
 import json
 import requests
@@ -11,6 +11,7 @@ from datetime import datetime
 from urllib.parse import urlparse
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
+from concurrent.futures import ThreadPoolExecutor
 
 # Load .env if present
 load_dotenv()
@@ -26,29 +27,14 @@ if db_url and db_url.startswith('postgres://'):
     db_url = db_url.replace('postgres://', 'postgresql://', 1)
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url or 'sqlite:///db.sqlite'
 
-# ==================== CELERY SETUP (Python-only) ====================
-from celery import Celery
-
-# Use REDIS_URL env variable if present, else default to localhost
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-
-celery = Celery(
-    app.name,
-    broker=REDIS_URL,
-    backend=REDIS_URL
-)
-celery.conf.update(
-    task_track_started=True,
-    task_serializer="json",
-    accept_content=["json"],
-    result_serializer="json",
-)
-
 # ==================== EXTENSIONS ====================
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
+
+# ThreadPool for background tasks
+executor = ThreadPoolExecutor(max_workers=5)
 
 PAGESPEED_API_KEY = os.getenv('PAGESPEED_API_KEY')
 
@@ -82,9 +68,8 @@ class Audit(db.Model):
 def load_user(user_id):
     return db.session.get(User, int(user_id))
 
-# ==================== CELERY TASK ====================
-@celery.task(bind=True)
-def run_full_audit_task(self, website_id):
+# ==================== BACKGROUND AUDIT TASK ====================
+def run_full_audit_task(website_id):
     with app.app_context():
         site = Website.query.get(website_id)
         if not site:
@@ -95,14 +80,8 @@ def run_full_audit_task(self, website_id):
         result = { "performance":0, "accessibility":0, "best_practices":0, "seo":0, "pwa":0,
                    "lcp":"N/A","cls":"N/A","fcp":"N/A","tbt":"N/A","tti":"N/A","speed_index":"N/A",
                    "page_size_kb":0,"total_requests":0,"has_https":False,
-                   "server_response_time":"N/A","title_tag":False,"meta_description":False,"viewport_tag":False,
-                   "robots_txt":False,"sitemap_xml":False,"canonical_tag":False,"hreflang_tags":False,"mobile_friendly":False,
-                   "structured_data":False,"open_graph_tags":False,"twitter_cards":False,
-                   "favicon":False,"gzip_compression":False,"cache_headers":False,"image_optimized":False,
-                   "js_minified":False,"css_minified":False,"unused_css":False,"unused_js":False,
-                   "render_blocking_resources":False,"third_party_js":False,"font_display_swap":False,
-                   "preload_key_requests":False,"modern_image_formats":False,"lazy_loading":False,
-                   "no_vulnerable_js":True,"no_mixed_content":True,"valid_ssl":True,
+                   "server_response_time":"N/A","title_tag":False,"meta_description":False,
+                   "robots_txt":False,"sitemap_xml":False,"gzip_compression":False,
                    "grade":"F","overall_score":0 }
 
         try:
@@ -187,7 +166,8 @@ def add():
     try:
         db.session.add(site)
         db.session.commit()
-        run_full_audit_task.delay(site.id)
+        # Run audit in background thread
+        executor.submit(run_full_audit_task, site.id)
         flash('Full 37-metric audit started (30-90s)!', 'success')
     except Exception as e:
         db.session.rollback()
@@ -208,12 +188,6 @@ def results(site_id):
         audit = json.loads(latest.data)
     return render_template('results.html', site=site, audit=audit, logo=LOGO)
 
-@app.route('/download/<int:site_id>')
-@login_required
-def download(site_id):
-    flash('PDF download disabled for deployment stability.', 'warning')
-    return redirect(url_for('results', site_id=site_id))
-
 @app.route('/logout')
 @login_required
 def logout():
@@ -232,9 +206,7 @@ with app.app_context():
         db.session.add(admin)
         db.session.commit()
 
-# ==================== RUN APP ====================
-application = app
-
+# ==================== RUN ====================
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=True)
