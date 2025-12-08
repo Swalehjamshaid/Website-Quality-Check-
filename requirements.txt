@@ -1,9 +1,9 @@
-Flask==2.3.3
-Flask-SQLAlchemy
-Flask-Login
-Flask-Bcrypt
-requests
-beautifulsoup4
-xhtml2pdf
 gunicorn
 psycopg2-binary
+Flask==2.3.3
+Flask-SQLAlchemy==3.1.1
+Flask-Login==0.6.3
+Flask-Bcrypt==1.0.1
+requests==2.31.0
+beautifulsoup4==4.12.3
+xhtml2pdf==1.0.0
