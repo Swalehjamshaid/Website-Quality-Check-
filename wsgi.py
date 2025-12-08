@@ -1,4 +1,4 @@
-# wsgi.py — 100% Python-only, no Redis, no Celery
+# wsgi.py — 100% Python-only, production-ready async audits
 import os
 import json
 import requests
@@ -11,9 +11,9 @@ from datetime import datetime
 from urllib.parse import urlparse
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# Load .env if present
+# Load environment variables
 load_dotenv()
 
 # ==================== CORE SETUP ====================
@@ -21,24 +21,24 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', '37metrics-pro-2025')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# Database Configuration
+# Database
 db_url = os.getenv('DATABASE_URL')
 if db_url and db_url.startswith('postgres://'):
     db_url = db_url.replace('postgres://', 'postgresql://', 1)
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url or 'sqlite:///db.sqlite'
 
-# ==================== EXTENSIONS ====================
+# Extensions
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
-# ThreadPool for background tasks
-executor = ThreadPoolExecutor(max_workers=5)
+# ThreadPool for background audits
+executor = ThreadPoolExecutor(max_workers=10)  # Handles multiple audits concurrently
 
 PAGESPEED_API_KEY = os.getenv('PAGESPEED_API_KEY')
 
-# Logo setup
+# Logo
 try:
     with open("ff_logo.png", "rb") as f:
         LOGO = base64.b64encode(f.read()).decode()
@@ -68,8 +68,9 @@ class Audit(db.Model):
 def load_user(user_id):
     return db.session.get(User, int(user_id))
 
-# ==================== BACKGROUND AUDIT TASK ====================
+# ==================== BACKGROUND AUDIT ====================
 def run_full_audit_task(website_id):
+    """Background audit task."""
     with app.app_context():
         site = Website.query.get(website_id)
         if not site:
@@ -77,12 +78,14 @@ def run_full_audit_task(website_id):
             return
 
         url = site.url
-        result = { "performance":0, "accessibility":0, "best_practices":0, "seo":0, "pwa":0,
-                   "lcp":"N/A","cls":"N/A","fcp":"N/A","tbt":"N/A","tti":"N/A","speed_index":"N/A",
-                   "page_size_kb":0,"total_requests":0,"has_https":False,
-                   "server_response_time":"N/A","title_tag":False,"meta_description":False,
-                   "robots_txt":False,"sitemap_xml":False,"gzip_compression":False,
-                   "grade":"F","overall_score":0 }
+        result = {
+            "performance":0,"accessibility":0,"best_practices":0,"seo":0,"pwa":0,
+            "lcp":"N/A","cls":"N/A","fcp":"N/A","tbt":"N/A","tti":"N/A","speed_index":"N/A",
+            "page_size_kb":0,"total_requests":0,"has_https":False,
+            "server_response_time":"N/A","title_tag":False,"meta_description":False,
+            "robots_txt":False,"sitemap_xml":False,"gzip_compression":False,
+            "grade":"F","overall_score":0
+        }
 
         try:
             headers = {'User-Agent': '37Metrics-Pro-Auditor v2.0 (+https://37metrics.live)'}
@@ -118,12 +121,14 @@ def run_full_audit_task(website_id):
                     result['cls'] = audits.get('cumulative-layout-shift', {}).get('displayValue','N/A')
                     result['fcp'] = audits.get('first-contentful-paint', {}).get('displayValue','N/A')
         except Exception as e:
-            print(f"37Metrics Audit Task Error for {url}: {e}")
+            print(f"37Metrics Audit Error for {url}: {e}")
 
+        # Calculate grade
         avg = (result['performance']+result['accessibility']+result['best_practices']+result['seo'])/4
         result['overall_score'] = round(avg,1)
         result['grade'] = "A" if avg>=90 else "B" if avg>=80 else "C" if avg>=70 else "D" if avg>=60 else "F"
 
+        # Save audit
         try:
             audit = Audit(website_id=website_id, data=json.dumps(result))
             db.session.add(audit)
@@ -166,9 +171,9 @@ def add():
     try:
         db.session.add(site)
         db.session.commit()
-        # Run audit in background thread
+        # Submit audit to thread pool (non-blocking)
         executor.submit(run_full_audit_task, site.id)
-        flash('Full 37-metric audit started (30-90s)!', 'success')
+        flash('Audit started in background!', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f"Error starting audit: {e}", 'error')
@@ -182,7 +187,7 @@ def results(site_id):
         return redirect('/dashboard')
     latest = Audit.query.filter_by(website_id=site_id).order_by(Audit.created_at.desc()).first()
     if not latest:
-        audit = { "overall_score": "...", "performance": "...", "accessibility": "...", "seo": "...", "lcp": "N/A" }
+        audit = {"overall_score": "...", "performance": "...", "accessibility": "...", "seo": "...", "lcp": "N/A"}
         flash('Audit is still running in background.', 'warning')
     else:
         audit = json.loads(latest.data)
