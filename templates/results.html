@@ -1,41 +1,77 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Audit Report - {{ site.name or site.url }}</title>
-  <style>
-    body {font-family: 'Segoe UI', sans-serif; background:#f8f9ff; padding:40px;}
-    .card {max-width:1000px; margin:auto; background:white; padding:40px; border-radius:20px; box-shadow:0 20px 50px rgba(0,0,0,0.15);}
-    .grade {font-size:80px; font-weight:bold; text-align:center;}
-    .A {color:#28a745;} .B {color:#74b816;} .C {color:#ffc107;} .D {color:#fd7e14;} .F {color:#dc3545;}
-    .score-box {display:inline-block; padding:20px; background:#f8f9fa; border-radius:15px; margin:10px; text-align:center; width:180px;}
-  </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Audit Report: {{ site.name }}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>body { font-family: 'Inter', sans-serif; }</style>
 </head>
-<body>
-<div class="card">
-  <h1>Audit Report: {{ site.name or site.url }}</h1>
-  <p><a href="/dashboard">Back to Dashboard</a> | <a href="/download/{{ site.id }}">Download PDF</a></p>
+<body class="bg-gray-50 text-gray-800">
+  <div class="max-w-5xl mx-auto p-6 bg-white shadow-xl mt-10 rounded-2xl">
+    <div class="text-center mb-8">
+      <h1 class="text-4xl font-bold text-purple-700">37Metrics Web Audit Report</h1>
+      <p class="text-xl text-gray-600 mt-2">{{ site.name }} • {{ site.url }}</p>
+      <p class="mt-4"><a href="/dashboard" class="text-purple-600 hover:underline">← Back to Dashboard</a> | 
+      <a href="/download/{{ site.id }}" class="text-purple-600 hover:underline font-semibold">Download PDF</a></p>
+    </div>
 
-  <div style="text-align:center; margin:30px 0;">
-    <div class="grade {{ audit.grade }}">{{ audit.grade }}</div>
-    <p style="font-size:24px; color:#666;">Overall Performance Score: {{ audit.performance }}/100</p>
+    <div class="text-center my-10">
+      <div class="text-9xl font-bold" style="color: {{ 'green' if audit.grade=='A' else 'limegreen' if audit.grade=='B' else 'orange' if audit.grade=='C' else 'red' }}">
+        {{ audit.grade }}
+      </div>
+      <p class="text-2xl mt-4">Overall Score: {{ ((audit.performance + audit.accessibility + audit.best_practices + audit.seo)/4)|round(1) }}/100</p>
+    </div>
+
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-10">
+      <div class="bg-red-50 p-4 rounded-xl text-center"><span class="block text-sm text-gray-600">Performance</span><span class="text-3xl font-bold text-red-600">{{ audit.performance }}</span></div>
+      <div class="bg-blue-50 p-4 rounded-xl text-center"><span class="block text-sm text-gray-600">Accessibility</span><span class="text-3xl font-bold text-blue-600">{{ audit.accessibility }}</span></div>
+      <div class="bg-green-50 p-4 rounded-xl text-center"><span class="block text-sm text-gray-600">Best Practices</span><span class="text-3xl font-bold text-green-600">{{ audit.best_practices }}</span></div>
+      <div class="bg-purple-50 p-4 rounded-xl text-center"><span class="block text-sm text-gray-600">SEO</span><span class="text-3xl font-bold text-purple-600">{{ audit.seo }}</span></div>
+      <div class="bg-yellow-50 p-4 rounded-xl text-center"><span class="block text-sm text-gray-600">PWA</span><span class="text-3xl font-bold text-yellow-600">{{ audit.pwa }}"></span></div>
+    </div>
+
+    <h2 class="text-2xl font-bold mb-4">Core Web Vitals & Performance</h2>
+    <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
+      <div class="bg-gray-100 p-4 rounded"><strong>LCP:</strong> {{ audit.lcp }}</div>
+      <div class="bg-gray-100 p-4 rounded"><strong>CLS:</strong> {{ audit.cls }}</div>
+      <div class="bg-gray-100 p-4 rounded"><strong>FCP:</strong> {{ audit.fcp }}</div>
+      <div class="bg-gray-100 p-4 rounded"><strong>TBT:</strong> {{ audit.tbt }}</div>
+      <div class="bg-gray-100 p-4 rounded"><strong>TTI:</strong> {{ audit.tti }}</div>
+      <div class="bg-gray-100 p-4 rounded"><strong>Speed Index:</strong> {{ audit.si }}</div>
+    </div>
+
+    <h2 class="text-2xl font-bold mb-4">37 Professional Metrics Checklist</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-lg">
+      <ul class="space-y-3">
+        <li class="{{ 'text-green-600' if audit.has_https else 'text-red-600' }}">HTTPS Secured</li>
+        <li class="{{ 'text-green-600' if audit.title_tag else 'text-red-600' }}">Title Tag Present</li>
+        <li class="{{ 'text-green-600' if audit.meta_desc else 'text-red-600' }}">Meta Description</li>
+        <li class="{{ 'text-green-600' if audit.viewport else 'text-red-600' }}">Mobile Viewport</li>
+        <li class="{{ 'text-green-600' if audit.robots_txt else 'text-red-600' }}">robots.txt Exists</li>
+        <li class="{{ 'text-green-600' if audit.sitemap else 'text-red-600' }}">sitemap.xml</li>
+        <li class="{{ 'text-green-600' if audit.canonical else 'text-red-600' }}">Canonical URL</li>
+        <li class="{{ 'text-green-600' if audit.mobile_friendly else 'text-red-600' }}">Mobile Friendly</li>
+        <li class="{{ 'text-green-600' if audit.structured_data else 'text-orange-600' }}">Structured Data</li>
+        <li class="{{ 'text-green-600' if audit.open_graph else 'text-orange-600' }}">Open Graph Tags</li>
+        <li class="{{ 'text-green-600' if audit.twitter_cards else 'text-orange-600' }}">Twitter Cards</li>
+        <li class="{{ 'text-green-600' if audit.favicon else 'text-red-600' }}">Favicon</li>
+        <li class="{{ 'text-green-600' if audit.gzip_compression else 'text-red-600' }}">Gzip/Brotli</li>
+        <li class="{{ 'text-green-600' if audit.cache_policy else 'text-red-600' }}">Cache Headers</li>
+        <li class="{{ 'text-green-600' if audit.font_display_swap else 'text-orange-600' }}">Font Display Swap</li>
+        <li class="{{ 'text-green-600' if audit.preload_key_requests else 'text-orange-600' }}">Key Requests Preload</li>
+        <li><strong>Page Size:</strong> {{ audit.page_size_kb }} KB</li>
+        <li><strong>HTTP Requests:</strong> {{ audit.requests }}</li>
+        <li><strong>Server Response:</strong> {{ audit.server_response_time }}</li>
+      </ul>
+    </div>
+
+    <div class="mt-10 text-center">
+      <a href="/download/{{ site.id }}" class="bg-purple-700 text-white px-8 py-4 rounded-full text-xl hover:bg-purple-800 transition">
+        Download Full PDF Report
+      </a>
+    </div>
   </div>
-
-  <div style="display:flex; justify-content:center; flex-wrap:wrap;">
-    <div class="score-box"><strong>Performance</strong><br><h2>{{ audit.performance }}</h2></div>
-    <div class="score-box"><strong>Accessibility</strong><br><h2>{{ audit.accessibility }}</h2></div>
-    <div class="score-box"><strong>Best Practices</strong><br><h2>{{ audit.best_practices }}</h2></div>
-    <div class="score-box"><strong>SEO</strong><br><h2>{{ audit.seo }}</h2></div>
-  </div>
-
-  <h2>Core Web Vitals</h2>
-  <p>LCP: {{ audit.lcp }} | CLS: {{ audit.cls }} | FCP: {{ audit.fcp }}</p>
-
-  <h2>Recommendations</h2>
-  <ul>
-    {% for suggestion in audit.suggestions %}
-      <li>{{ suggestion }}</li>
-    {% endfor %}
-  </ul>
-</div>
 </body>
 </html>
