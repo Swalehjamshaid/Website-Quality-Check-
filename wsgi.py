@@ -1,8 +1,9 @@
-# wsgi.py — FINAL 37 METRICS PRO VERSION — Optimized for Railway with Celery
+# wsgi.py — 37 METRICS PRO VERSION — Production-Ready for Railway with Celery
 import os
 import json
 import requests
 import base64
+import logging
 from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
@@ -12,12 +13,17 @@ from urllib.parse import urlparse
 from bs4 import BeautifulSoup
 from celery import Celery
 
+# ==================== LOGGING ====================
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # ==================== CORE SETUP ====================
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', '37metrics-pro-2025')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SESSION_COOKIE_SECURE'] = True  # secure cookie if using HTTPS
 
-# Database Configuration (Railway/PostgreSQL compatible)
+# Database Configuration
 db_url = os.getenv('DATABASE_URL')
 if db_url and db_url.startswith('postgres://'):
     db_url = db_url.replace('postgres://', 'postgresql://', 1)
@@ -54,11 +60,12 @@ class Website(db.Model):
     url = db.Column(db.String(500), nullable=False)
     name = db.Column(db.String(200))
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    __table_args__ = (db.UniqueConstraint('user_id', 'url', name='user_website_uc'),)
 
 class Audit(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     website_id = db.Column(db.Integer, db.ForeignKey('website.id'))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
     data = db.Column(db.Text)  # Stores all 37 metrics as JSON
 
 @login_manager.user_loader
@@ -67,29 +74,31 @@ def load_user(user_id):
 
 # ==================== CELERY SETUP ====================
 celery = Celery(app.name, broker=app.config['CELERY_BROKER_URL'], backend=app.config['CELERY_RESULT_BACKEND'])
-celery.conf.update(app.config)
+celery.conf.update(
+    task_serializer='json',
+    result_serializer='json',
+    accept_content=['json'],
+    timezone='UTC',
+    enable_utc=True,
+)
 
-@celery.task(bind=True)
+@celery.task(bind=True, autoretry_for=(Exception,), retry_backoff=True)
 def run_full_audit_task(self, website_id):
     with app.app_context():
         site = Website.query.get(website_id)
         if not site:
-            print(f"Website ID {website_id} not found.")
+            logger.error(f"Website ID {website_id} not found.")
             return
 
         url = site.url
-        result = {
-            "performance": 0, "accessibility": 0, "best_practices": 0, "seo": 0, "pwa": 0,
-            "lcp": "N/A", "cls": "N/A", "fcp": "N/A", "tbt": "N/A", "tti": "N/A", "speed_index": "N/A",
-            "page_size_kb": 0, "total_requests": 0, "has_https": False,
-            "server_response_time": "N/A", "title_tag": False, "meta_description": False, "viewport_tag": False,
-            "robots_txt": False, "sitemap_xml": False, "canonical_tag": False, "hreflang_tags": False, "mobile_friendly": False,
-            "structured_data": False, "open_graph_tags": False, "twitter_cards": False,
-            "favicon": False, "gzip_compression": False, "cache_headers": False, "image_optimized": False, "js_minified": False, "css_minified": False,
-            "unused_css": False, "unused_js": False, "render_blocking_resources": False, "third_party_js": False, "font_display_swap": False, "preload_key_requests": False,
-            "modern_image_formats": False, "lazy_loading": False, "no_vulnerable_js": True, "no_mixed_content": True, "valid_ssl": True,
-            "grade": "F", "overall_score": 0,
-        }
+        result = {metric: 0 if metric in ['performance', 'accessibility', 'best_practices', 'seo', 'pwa', 'overall_score'] else "N/A" for metric in [
+            "performance", "accessibility", "best_practices", "seo", "pwa", "lcp", "cls", "fcp", "tbt", "tti", "speed_index",
+            "page_size_kb", "total_requests", "has_https", "server_response_time", "title_tag", "meta_description", "viewport_tag",
+            "robots_txt", "sitemap_xml", "canonical_tag", "hreflang_tags", "mobile_friendly", "structured_data", "open_graph_tags",
+            "twitter_cards", "favicon", "gzip_compression", "cache_headers", "image_optimized", "js_minified", "css_minified",
+            "unused_css", "unused_js", "render_blocking_resources", "third_party_js", "font_display_swap", "preload_key_requests",
+            "modern_image_formats", "lazy_loading", "no_vulnerable_js", "no_mixed_content", "valid_ssl", "grade", "overall_score"
+        ]}
 
         try:
             headers = {'User-Agent': '37Metrics-Pro-Auditor v2.0 (+https://37metrics.live)'}
@@ -97,14 +106,15 @@ def run_full_audit_task(self, website_id):
             final_url = r.url
             soup = BeautifulSoup(r.text, 'html.parser')
 
+            # Basic metrics
             result.update({
                 "page_size_kb": round(len(r.content) / 1024, 1),
                 "server_response_time": f"{r.elapsed.total_seconds():.2f}s",
                 "has_https": final_url.startswith('https://'),
                 "title_tag": bool(soup.title and soup.title.string and len(soup.title.string.strip()) > 0),
                 "meta_description": bool(soup.find('meta', attrs={'name': 'description'})),
-                "robots_txt": requests.head(f"{urlparse(final_url).scheme}://{urlparse(final_url).netloc}/robots.txt", timeout=8).status_code == 200,
-                "sitemap_xml": requests.head(f"{urlparse(final_url).scheme}://{urlparse(final_url).netloc}/sitemap.xml", timeout=8).status_code == 200,
+                "robots_txt": requests.head(f"{urlparse(final_url).scheme}://{urlparse(final_url).netloc}/robots.txt", timeout=5).status_code == 200,
+                "sitemap_xml": requests.head(f"{urlparse(final_url).scheme}://{urlparse(final_url).netloc}/sitemap.xml", timeout=5).status_code == 200,
                 "gzip_compression": 'gzip' in r.headers.get('content-encoding', '').lower() or 'br' in r.headers.get('content-encoding', '').lower(),
             })
 
@@ -120,17 +130,19 @@ def run_full_audit_task(self, website_id):
             cat = lr.get('categories', {})
             audits = lr.get('audits', {})
 
+            # Extract scores
             result['performance'] = round(cat.get('performance', {}).get('score', 0) * 100, 1)
             result['accessibility'] = round(cat.get('accessibility', {}).get('score', 0) * 100, 1)
             result['best_practices'] = round(cat.get('best-practices', {}).get('score', 0) * 100, 1)
             result['seo'] = round(cat.get('seo', {}).get('score', 0) * 100, 1)
 
+            # Extract vitals
             result['lcp'] = audits.get('largest-contentful-paint', {}).get('displayValue', 'N/A')
             result['cls'] = audits.get('cumulative-layout-shift', {}).get('displayValue', 'N/A')
             result['fcp'] = audits.get('first-contentful-paint', {}).get('displayValue', 'N/A')
 
         except Exception as e:
-            print(f"37Metrics Audit Task Error for {url}: {e}")
+            logger.error(f"37Metrics Audit Task Error for {url}: {e}")
 
         avg = (result['performance'] + result['accessibility'] + result['best_practices'] + result['seo']) / 4
         result['overall_score'] = round(avg, 1)
@@ -139,7 +151,7 @@ def run_full_audit_task(self, website_id):
         audit = Audit(website_id=website_id, data=json.dumps(result))
         db.session.add(audit)
         db.session.commit()
-        print(f"Audit for {url} completed with score {result['overall_score']}")
+        logger.info(f"Audit for {url} completed with score {result['overall_score']}")
 
 # ==================== ROUTES ====================
 @app.route('/', methods=['GET', 'POST'])
