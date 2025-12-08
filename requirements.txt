@@ -1,11 +1,14 @@
 Flask==2.3.3
-Flask-SQLAlchemy==3.0.5
-Flask-Login==0.6.3
-Flask-Bcrypt==1.0.1
-gunicorn==21.2.0
-celery==5.3.6
-redis==5.0.1
-requests==2.31.0
-beautifulsoup4==4.12.2
-weasyprint==62.1
-psycopg2-binary==2.9.9
+Flask-SQLAlchemy
+Flask-Login
+Flask-Bcrypt
+Flask-Mail
+requests
+beautifulsoup4
+gunicorn
+psycopg2-binary
+APScheduler
+# WeasyPrint with Cairo that works on Railway
+cairocffi
+cairosvg
+weasyprint
